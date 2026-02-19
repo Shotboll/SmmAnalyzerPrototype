@@ -1,0 +1,39 @@
+﻿@model IEnumerable<SmmAnalyzerPrototype.Models.RegulationDocument>
+@{
+    ViewData["Title"] = "Регламенты";
+}
+
+<h2>Нормативные документы</h2>
+<p class="text-muted">Правила и ограничения, применяемые при проверке постов</p>
+
+@if (Model.Any())
+{
+    <div class="row">
+        @foreach (var reg in Model)
+        {
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <strong>@reg.Title</strong>
+                        <span class="badge bg-secondary float-end">@reg.Category</span>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">@reg.Content</p>
+                        <small class="text-muted">Сообщество ID: @reg.CommunityId</small>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="alert alert-warning">
+        Нет загруженных регламентов. Обратитесь к администратору.
+    </div>
+}
+
+<div class="mt-4">
+    <a class="btn btn-outline-secondary" asp-controller="Home" asp-action="Index">← Назад</a>
+    <a class="btn btn-primary" asp-action="Create">Добавить регламент</a>
+</div>

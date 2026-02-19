@@ -1,0 +1,54 @@
+﻿@model IEnumerable<SmmAnalyzerPrototype.Models.Community>
+@{
+    ViewData["Title"] = "Сообщества";
+}
+
+<h2>Список сообществ</h2>
+<p class="text-muted">Управление метаданными сообществ, используемых при анализе постов</p>
+
+@if (Model.Any())
+{
+    <div class="row">
+        @foreach (var community in Model)
+        {
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">@community.Name</h5>
+                        <p><strong>Целевая аудитория:</strong><br />@community.TargetAudience</p>
+                        <p>
+                            <strong>Стиль общения:</strong><br />
+                            @switch (community.StyleProfile)
+                            {
+                                case SmmAnalyzerPrototype.Models.StyleProfile.Formal:
+                                    <span>Формальный</span>
+                                    break;
+                                case SmmAnalyzerPrototype.Models.StyleProfile.Informal:
+                                    <span>Неформальный</span>
+                                    break;
+                                case SmmAnalyzerPrototype.Models.StyleProfile.Neutral:
+                                    <span>Нейтральный</span>
+                                    break;
+                                default:
+                                    <span>Не задан</span>
+                                    break;
+                            }
+                        </p>
+                        <p><strong>Цели контент-стратегии:</strong><br />@community.ContentGoals</p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="alert alert-warning">
+        Нет зарегистрированных сообществ. Обратитесь к администратору.
+    </div>
+}
+
+<div class="mt-4">
+    <a class="btn btn-outline-secondary" asp-controller="Home" asp-action="Index">← Назад</a>
+    <a class="btn btn-primary" asp-action="Create">Добавить сообщество</a>
+</div>

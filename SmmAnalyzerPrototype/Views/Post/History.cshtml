@@ -1,0 +1,35 @@
+﻿@model List<Post>
+@{
+    ViewData["Title"] = "История публикаций";
+}
+
+<h2>История публикаций</h2>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Дата</th>
+            <th>Текст (фрагмент)</th>
+            <th>Статус</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var post in Model)
+        {
+            <tr>
+                <td>@post.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                <td>@(post.Text.Length > 50 ? post.Text[..50] + "..." : post.Text)</td>
+                <td>
+                    @if (post.Status == PostStatus.Approved)
+                    {
+                        <span class="badge bg-success">Одобрен</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-warning">Черновик</span>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

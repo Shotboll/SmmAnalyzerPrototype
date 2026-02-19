@@ -1,0 +1,29 @@
+﻿@model PostCreateModel
+@{
+    ViewData["Title"] = "ТЕСТ";
+}
+
+<h2>Создание нового поста</h2>
+
+<form asp-action="Create" method="post">
+    <div class="mb-3">
+        <label class="form-label">Сообщество</label>
+        <select asp-for="CommunityId" class="form-select" asp-items="ViewBag.Communities">
+            <option value="">Выберите сообщество</option>
+        </select>
+        <span asp-validation-for="CommunityId" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Текст поста</label>
+        <textarea asp-for="Text" class="form-control" rows="6" maxlength="5000"></textarea>
+        <div class="form-text">Максимум 5000 символов</div>
+        <span asp-validation-for="Text" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">@ViewBag.Result</label>
+    </div>
+
+    <button type="submit" class="btn btn-success">Проверить пост</button>
+    <a asp-action="History" class="btn btn-secondary">Эмбеддинг</a>
+</form>

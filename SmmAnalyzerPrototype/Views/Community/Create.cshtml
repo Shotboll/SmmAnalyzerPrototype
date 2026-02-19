@@ -1,0 +1,42 @@
+﻿@model CommunityCreateModel
+@{
+    ViewData["Title"] = "Добавить сообщество";
+}
+
+<h2>Создание нового сообщества</h2>
+
+<form asp-action="Create" method="post">
+    <div class="mb-3">
+        <label class="form-label">Название сообщества</label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Целевая аудитория</label>
+        <input asp-for="TargetAudience" class="form-control" placeholder="Например: студенты 18–25 лет" />
+        <span asp-validation-for="TargetAudience" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Стиль общения</label>
+        <select asp-for="StyleProfile" class="form-select">
+            <option value="0">Формальный</option>
+            <option value="1">Неформальный</option>
+            <option value="2">Нейтральный</option>
+        </select>
+        <span asp-validation-for="StyleProfile" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Цели контент-стратегии</label>
+        <textarea asp-for="ContentGoals" class="form-control" rows="2"></textarea>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Добавить</button>
+    <a asp-action="Index" class="btn btn-secondary">Отмена</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

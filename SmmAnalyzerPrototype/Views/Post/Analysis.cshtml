@@ -1,0 +1,37 @@
+﻿@model AnalysisResult
+@{
+    ViewData["Title"] = "Результат анализа";
+}
+
+<h2>Результаты анализа</h2>
+
+<div class="alert alert-info">@Model.EngagementForecast</div>
+
+<h4>Грамматические ошибки:</h4>
+@if (Model.GrammarErrors.Any())
+{
+    <ul>
+        @foreach (var err in Model.GrammarErrors)
+        {
+            <li><strong>@err.Type</strong>: "@err.Fragment" → "@err.Suggestion"</li>
+        }
+    </ul>
+}
+else
+{
+    <p class="text-success">Ошибок не обнаружено</p>
+}
+
+<h4>Стиль:</h4>
+<p>@Model.StyleAssessment</p>
+
+<h4>Рекомендации:</h4>
+<ul>
+    @foreach (var rec in Model.Recommendations)
+    {
+        <li><strong>@rec.Topic</strong> — @rec.Reason</li>
+    }
+</ul>
+
+<a asp-action="Create" class="btn btn-secondary">Анализировать ещё</a>
+<a asp-action="History" class="btn btn-outline-primary">История</a>
