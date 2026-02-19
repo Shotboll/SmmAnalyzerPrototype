@@ -1,4 +1,14 @@
+using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL;
+using RAGTEST.Data;
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        x => x.UseVector()
+    ));
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
