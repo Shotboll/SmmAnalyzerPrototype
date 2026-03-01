@@ -4,27 +4,24 @@ using OllamaSharp;
 using Pgvector;
 using RAGTEST.Data;
 using RAGTEST.Models;
-using RAGTEST.Services;
 
 namespace RAGTEST.Controllers
 {
-    public class RagTestController : Controller
+    public class RagSaveController : Controller
     {
         private readonly AppDbContext _context;
-        private readonly IEmbeddingService _embeddingService;
-        private readonly LlmService _llmService;
+        private readonly OllamaApiClient _ollama;
 
-        public RagTestController(AppDbContext context, IEmbeddingService embeddingService, LlmService llmService)
+        public RagSaveController(AppDbContext context)
         {
             _context = context;
-            _embeddingService = embeddingService;
-            _llmService = llmService;
+            _ollama = new OllamaApiClient(new Uri("http://localhost:11434/"));
+            _ollama.SelectedModel = "bge-m3";
         }
 
-        private float[] NormalizeVector(float[] vector)
+        float[] NormalizeVector(float[] vector)
         {
             float norm = (float)Math.Sqrt(vector.Sum(x => x * x));
-            if (norm == 0) return vector;
             return vector.Select(x => x / norm).ToArray();
         }
 
@@ -45,8 +42,9 @@ namespace RAGTEST.Controllers
 
             try
             {
-                float[] embeddingArray = await _embeddingService.GetEmbeddingAsync(chunkText, isQuery: false);
-                float[] normalizedVector = NormalizeVector(embeddingArray);
+                var embeddingResponse = await _ollama.EmbedAsync("passage: " + chunkText);
+                float[] rawVector = embeddingResponse.Embeddings[0];
+                float[] normalizedVector = NormalizeVector(rawVector);
 
                 var pgVector = new Vector(normalizedVector);
 
@@ -93,8 +91,9 @@ namespace RAGTEST.Controllers
 
             try
             {
-                float[] queryEmbedding = await _embeddingService.GetEmbeddingAsync(queryText, isQuery: true);
-                float[] normalizedQuery = NormalizeVector(queryEmbedding);
+                var queryEmbeddingResponse = await _ollama.EmbedAsync("query: " + queryText);
+                float[] queryArray = queryEmbeddingResponse.Embeddings[0];
+                queryArray = NormalizeVector(queryArray);
 
                 var allChunks = await _context.RegulationChunks
                     .Where(c => c.CommunityId == communityId)
@@ -108,12 +107,14 @@ namespace RAGTEST.Controllers
 
                     float[] chunkArray = chunk.Embedding.ToArray();
 
-                    double dot = 0;
-                    for (int i = 0; i < normalizedQuery.Length; i++)
+                    double dot = 0, normQuery = 0, normChunk = 0;
+                    for (int i = 0; i < queryArray.Length; i++)
                     {
-                        dot += normalizedQuery[i] * chunkArray[i];
+                        dot += queryArray[i] * chunkArray[i];
+                        normQuery += queryArray[i] * queryArray[i];
+                        normChunk += chunkArray[i] * chunkArray[i];
                     }
-                    double distance = 1.0 - dot;
+                    double distance = 1.0 - dot / (Math.Sqrt(normQuery) * Math.Sqrt(normChunk));
 
                     if (distance <= threshold)
                     {
@@ -135,37 +136,6 @@ namespace RAGTEST.Controllers
                 ViewBag.Error = $"Ошибка при поиске: {ex.Message}";
             }
             return View("Index");
-        }
-
-        public IActionResult SaigaRag()
-        {
-            return View();
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> CheckText(string text, Guid communityId)
-        {
-            ViewBag.Text = text;
-            ViewBag.CommunityId = communityId;
-
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                ViewBag.Error = "Введите текст для проверки";
-                return View("SaigaRag");
-            }
-
-            try
-            {
-
-                var result = await _llmService.AnalyzePostWithRagAsync(text, communityId, 3);
-                ViewBag.Result = result;
-            }
-            catch (Exception ex)
-            {
-                ViewBag.Error = $"Ошибка при анализе: {ex.Message}";
-            }
-
-            return View("SaigaRag");
         }
     }
 }
