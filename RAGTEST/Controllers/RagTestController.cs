@@ -21,16 +21,17 @@ namespace RAGTEST.Controllers
             _llmService = llmService;
         }
 
+        public IActionResult Index()
+        {
+            return View();
+        }
+
+        //-------------------------RAGTEST----------------------------
         private float[] NormalizeVector(float[] vector)
         {
             float norm = (float)Math.Sqrt(vector.Sum(x => x * x));
             if (norm == 0) return vector;
             return vector.Select(x => x / norm).ToArray();
-        }
-
-        public IActionResult Index()
-        {
-            return View();
         }
 
         [HttpPost]
@@ -137,6 +138,8 @@ namespace RAGTEST.Controllers
             return View("Index");
         }
 
+        //-------------------------RAGTEST----------------------------
+
         public IActionResult SaigaRag()
         {
             return View();
@@ -166,6 +169,68 @@ namespace RAGTEST.Controllers
             }
 
             return View("SaigaRag");
+        }
+
+        public IActionResult TextErrors()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CheckErrorText(string text, Guid communityId)
+        {
+            ViewBag.Text = text;
+            ViewBag.CommunityId = communityId;
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                ViewBag.Error = "Введите текст для проверки";
+                return View("TextErrors");
+            }
+
+            try
+            {
+
+                var result = await _llmService.CheckErrorText(text, communityId);
+                ViewBag.Result = result;
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Error = $"Ошибка при анализе: {ex.Message}";
+            }
+
+            return View("TextErrors");
+        }
+
+        public IActionResult StyleCheck()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> StyleCheck(string audience, string style, string text)
+        {
+            ViewBag.Audience = audience;
+            ViewBag.Style = style;
+            ViewBag.Text = text;
+
+            if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(audience) || string.IsNullOrWhiteSpace(style))
+            {
+                ViewBag.Error = "Заполните все поля";
+                return View("StyleCheck");
+            }
+
+            try
+            {
+                var result = await _llmService.StyleCheck(audience,style, text);
+                ViewBag.StyleResult = result;
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Error = $"Ошибка: {ex.Message}";
+            }
+
+            return View("StyleCheck");
         }
     }
 }

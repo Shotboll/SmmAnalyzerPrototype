@@ -5,6 +5,7 @@ using OllamaSharp;
 using RAGTEST.Data;
 using System.Text;
 using System.Text.Json;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace RAGTEST.Services
 {
@@ -22,6 +23,23 @@ namespace RAGTEST.Services
             _httpClient = httpClient;
             _model = configuration["Llm:Model"] ?? "saiga_yandexgpt_8b";
         }
+
+        public async Task<string> CallLlmAsync(string prompt)
+        {
+            var requestBody = new
+            {
+                model = _model,
+                prompt = prompt,
+                stream = false
+            };
+            var json = JsonSerializer.Serialize(requestBody);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync("http://localhost:11434/api/generate", content);
+            var result = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(result);
+            return doc.RootElement.GetProperty("response").GetString() ?? "";
+        }
+
         private float[] NormalizeVector(float[] vector)
         {
             float norm = (float)Math.Sqrt(vector.Sum(x => x * x));
@@ -75,21 +93,56 @@ namespace RAGTEST.Services
                 Не придумывай нарушения там, где их нет. Правила применяй буквально. 
                 ";
 
-            var requestBody = new
-            {
-                model = _model,
-                prompt = prompt,
-                stream = false
-            };
+            return await CallLlmAsync(prompt);
+        }
 
-            var json = JsonSerializer.Serialize(requestBody);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+        public async Task<string> CheckErrorText(string postText, Guid communityId)
+        {
+            var prompt = $@"
+                Ты — корректор текстов. Проверяй ТОЛЬКО реальный текст ниже.
 
-            var response = await _httpClient.PostAsync("http://localhost:11434/api/generate", content);
-            var result = await response.Content.ReadAsStringAsync();
+                ПРАВИЛА:
+                1. Находи ТОЛЬКО явные орфографические и пунктуационные ошибки
+                2. Если слово написано правильно — НЕ отмечай его
+                3. Если сомневаешься — считай, что ошибки нет
+                4. НЕ выдумывай ошибки
+                5. НЕ исправляй стилистику, только орфографию и пунктуацию
 
-            using var doc = JsonDocument.Parse(result);
-            return doc.RootElement.GetProperty("response").GetString() ?? "Ошибка получения ответа";
+                ФОРМАТ ОТВЕТА (ТОЛЬКО JSON):
+                [
+                  {{
+                    ""fragment"": ""ошибочный фрагмент"",
+                    ""suggestion"": ""исправленный вариант"",
+                    ""type"": ""орфография"" или ""пунктуация""
+                  }}
+                ]
+
+                Если ошибок нет — верни пустой массив: []
+
+                ТЕКСТ ДЛЯ ПРОВЕРКИ:
+                {postText}
+            ";
+
+            return await CallLlmAsync(prompt);
+        }
+
+        public async Task<string> StyleCheck(string audience, string style, string text)
+        {
+            var prompt = $@"
+                    Ты — стилист текстов для социальных сетей. Оцени, соответствует ли данный пост стилю и целевой аудитории. Не обращай внимания на Орфографию и пунктуацию
+
+                    Целевая аудитория: {audience}
+                    Желаемый стиль: {style}
+
+                    Текст поста: ""{text}""
+
+                    Дай развёрнутый ответ в свободной форме:
+                    - Соответствует ли стиль аудитории? (да/нет/частично)
+                    - Если нет или частично, что именно не так?
+                    - Как можно улучшить текст, чтобы он лучше подходил?
+                ";
+
+            return await CallLlmAsync(prompt);
         }
     }
 }

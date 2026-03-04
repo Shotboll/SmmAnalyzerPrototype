@@ -11,7 +11,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         x => x.UseVector()
     ));
 
-builder.Services.AddHttpClient<LlmService>(client => client.BaseAddress = new Uri("http://localhost:11434/"));
+builder.Services.AddHttpClient<LlmService>(client => 
+{ 
+    client.BaseAddress = new Uri("http://localhost:11434/"); 
+    client.Timeout = TimeSpan.FromMinutes(5);
+});
 
 builder.Services.AddHttpClient<IEmbeddingService, E5EmbeddingService>(client =>
 {
