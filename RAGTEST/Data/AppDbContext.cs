@@ -9,6 +9,12 @@ namespace RAGTEST.Data
         {
         }
 
+        public DbSet<User> Users { get; set; }
+        public DbSet<Community> Communities { get; set; }
+        public DbSet<Post> Posts { get; set; }
+        public DbSet<AnalysisResult> AnalysisResults { get; set; }
+        public DbSet<CommunityPost> CommunityPosts { get; set; }
+        public DbSet<RegulationDocument> RegulationDocuments { get; set; }
         public DbSet<RegulationChunk> RegulationChunks { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -20,8 +26,18 @@ namespace RAGTEST.Data
             modelBuilder.Entity<RegulationChunk>(entity =>
             {
                 entity.Property(e => e.Embedding)
-                      .HasColumnType("vector(1024)"); // или vector без размера, если не фиксирован
+                      .HasColumnType("vector(1024)");
             });
+
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Login)
+                .IsUnique();
+
+            modelBuilder.Entity<AnalysisResult>()
+                .HasOne(ar => ar.Post)
+                .WithOne()
+                .HasForeignKey<AnalysisResult>(ar => ar.PostId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

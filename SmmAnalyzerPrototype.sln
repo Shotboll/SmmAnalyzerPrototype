@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmmAnalyzerPrototype", "Smm
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RAGTEST", "RAGTEST\RAGTEST.csproj", "{CCCB21A0-7CE6-41F1-AC65-8B9321217C8C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmmAnalyzerPrototype.Data", "SmmAnalyzerPrototype.Data\SmmAnalyzerPrototype.Data.csproj", "{3E79E721-289C-496D-A81E-ED0905CEF709}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{CCCB21A0-7CE6-41F1-AC65-8B9321217C8C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CCCB21A0-7CE6-41F1-AC65-8B9321217C8C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CCCB21A0-7CE6-41F1-AC65-8B9321217C8C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3E79E721-289C-496D-A81E-ED0905CEF709}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3E79E721-289C-496D-A81E-ED0905CEF709}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3E79E721-289C-496D-A81E-ED0905CEF709}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3E79E721-289C-496D-A81E-ED0905CEF709}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

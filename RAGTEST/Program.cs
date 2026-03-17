@@ -22,6 +22,8 @@ builder.Services.AddHttpClient<IEmbeddingService, E5EmbeddingService>(client =>
     client.BaseAddress = new Uri("http://localhost:8001/");
 });
 
+builder.Services.AddSingleton<VkService>();
+
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 

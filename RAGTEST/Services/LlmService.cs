@@ -21,7 +21,7 @@ namespace RAGTEST.Services
             _embeddingService = embeddingService;
             _context = context;
             _httpClient = httpClient;
-            _model = configuration["Llm:Model"] ?? "saiga_yandexgpt_8b";
+            _model = configuration["Llm:Model"] ?? "saiga_nemo_12b";
         }
 
         public async Task<string> CallLlmAsync(string prompt)
@@ -47,26 +47,26 @@ namespace RAGTEST.Services
             return vector.Select(x => x / norm).ToArray();
         }
 
-        public async Task<string> AnalyzePostWithRagAsync(string postText, Guid communityId, int topK = 5)
+        public async Task<string> AnalyzePostWithRagAsync(string postText, Guid regulationId, int topK = 5)
         {
             float[] queryEmbedding = await _embeddingService.GetEmbeddingAsync(postText, isQuery: true);
             float[] normalizedQuery = NormalizeVector(queryEmbedding);
 
             var allChunks = await _context.RegulationChunks
-            .Where(c => c.CommunityId == communityId)
+            .Where(c => c.RegulationId == regulationId)
             .ToListAsync();
 
             var chunks = await _context.RegulationChunks
                 .FromSqlRaw(@"
                     SELECT * FROM regulation_chunks
-                    WHERE community_id = {0}
+                    WHERE regulation_id = {0}
                     ORDER BY embedding <=> {1}::vector
                     LIMIT {2}
-                ", communityId, normalizedQuery, topK)
+                ", regulationId, normalizedQuery, topK)
                 .ToListAsync();
 
             var contextText = string.Join("\n\n", chunks.Select((x, i) =>
-                $"Правило {i + 1} (категория: {x.MetadataJson}):\n{x.ChunkText}"
+                $"Правило {i + 1} (\n{x.ChunkText}"
             ));
 
             var prompt = $@"
@@ -82,7 +82,7 @@ namespace RAGTEST.Services
                   ""hasViolations"": true/false,
                   ""violations"": [
                     {{
-                      ""ruleNumber"": <номер правила>,
+                      ""ruleNumber"": <номер правила>, <содержание правила>
                       ""explanation"": ""<почему нарушает>""
                     }}
                   ],

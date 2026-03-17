@@ -1,10 +1,12 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Localization;
 using Microsoft.EntityFrameworkCore;
 using OllamaSharp;
 using Pgvector;
 using RAGTEST.Data;
 using RAGTEST.Models;
 using RAGTEST.Services;
+using System.Threading.Tasks;
 
 namespace RAGTEST.Controllers
 {
@@ -13,12 +15,14 @@ namespace RAGTEST.Controllers
         private readonly AppDbContext _context;
         private readonly IEmbeddingService _embeddingService;
         private readonly LlmService _llmService;
+        private readonly VkService _vkService;
 
-        public RagTestController(AppDbContext context, IEmbeddingService embeddingService, LlmService llmService)
+        public RagTestController(AppDbContext context, IEmbeddingService embeddingService, LlmService llmService, VkService vkService)
         {
             _context = context;
             _embeddingService = embeddingService;
             _llmService = llmService;
+            _vkService = vkService;
         }
 
         public IActionResult Index()
@@ -53,12 +57,10 @@ namespace RAGTEST.Controllers
 
                 var chunk = new RegulationChunk
                 {
-                    CommunityId = communityId,
                     RegulationId = Guid.NewGuid(),
                     ChunkText = chunkText,
                     ChunkIndex = 0,
                     Embedding = pgVector,
-                    MetadataJson = metadata,
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -78,7 +80,7 @@ namespace RAGTEST.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Search(string queryText, Guid communityId, int topK = 5)
+        public async Task<IActionResult> Search(string queryText, Guid regulationId, int topK = 5)
         {
             double threshold = 0.2;
 
@@ -98,7 +100,7 @@ namespace RAGTEST.Controllers
                 float[] normalizedQuery = NormalizeVector(queryEmbedding);
 
                 var allChunks = await _context.RegulationChunks
-                    .Where(c => c.CommunityId == communityId)
+                    .Where(c => c.RegulationId == regulationId)
                     .ToListAsync();
 
                 var results = new List<(RegulationChunk Chunk, double Distance)>();
@@ -127,7 +129,6 @@ namespace RAGTEST.Controllers
                 ViewBag.Results = topResults.Select(x => x.Chunk).ToList();
                 ViewBag.Distances = topResults.ToDictionary(x => x.Chunk.Id, x => x.Distance);
                 ViewBag.QueryText = queryText;
-                ViewBag.CommunityId = communityId;
                 ViewBag.Threshold = threshold;
                 ViewBag.TopK = topK;
             }
@@ -231,6 +232,16 @@ namespace RAGTEST.Controllers
             }
 
             return View("StyleCheck");
+        }
+
+        public async Task<IActionResult> Posts()
+        {
+
+            var result = await _vkService.GetLatestPostsAsync();
+
+            ViewBag.GroupId = 11069256;
+
+            return View(result);
         }
     }
 }
