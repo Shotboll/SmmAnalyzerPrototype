@@ -1,6 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using RAGTEST.Models;
-using System.Diagnostics;
 
 namespace RAGTEST.Controllers
 {

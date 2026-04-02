@@ -22,10 +22,8 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-                        </li>
-                        <li class="nav-item">
+
+                        @* <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="RagTest" asp-action="Index">RAG</a>
                         </li>
                         <li class="nav-item">
@@ -39,6 +37,19 @@
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="RagTest" asp-action="Posts">Посты</a>
+                        </li> *@
+
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Community" asp-action="Index">Сообщества</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Regulation" asp-action="Index">Регламенты</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Post" asp-action="Create">Проверка на ошибки</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Post" asp-action="StyleCheck">Проверка стиля</a>
                         </li>
                     </ul>
                 </div>

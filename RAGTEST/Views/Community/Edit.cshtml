@@ -1,0 +1,28 @@
+﻿@using SmmAnalyzerPrototype.Data.Models.DTO
+@using SmmAnalyzerPrototype.Data.Models.DTO.Community
+@model UpdateCommunityRequest
+
+@{
+    var id = ViewBag.Id;
+}
+
+<h2>Редактировать сообщество</h2>
+
+<form asp-action="Edit" method="post">
+    <input type="hidden" name="id" value="@id" />
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label">Название</label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="TargetAudience" class="form-label">Целевая аудитория</label>
+        <input asp-for="TargetAudience" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label asp-for="StyleProfile" class="form-label">Стиль общения</label>
+        <input asp-for="StyleProfile" class="form-control" />
+    </div>
+    <button type="submit" class="btn btn-primary">Сохранить</button>
+    <a asp-action="Index" class="btn btn-secondary">Отмена</a>
+</form>

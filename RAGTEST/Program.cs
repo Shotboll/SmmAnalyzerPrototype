@@ -1,28 +1,17 @@
 using Microsoft.EntityFrameworkCore;
-using Npgsql.EntityFrameworkCore.PostgreSQL;
-using RAGTEST.Data;
-using RAGTEST.Services;
+using SmmAnalyzerPrototype.Data.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
-        x => x.UseVector()
-    ));
-
-builder.Services.AddHttpClient<LlmService>(client => 
-{ 
-    client.BaseAddress = new Uri("http://localhost:11434/"); 
+builder.Services.AddHttpClient("Api", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7001");
     client.Timeout = TimeSpan.FromMinutes(5);
 });
 
-builder.Services.AddHttpClient<IEmbeddingService, E5EmbeddingService>(client =>
-{
-    client.BaseAddress = new Uri("http://localhost:8001/");
-});
-
-builder.Services.AddSingleton<VkService>();
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
+        o => o.UseVector()));
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
@@ -44,8 +33,15 @@ app.UseRouting();
 
 app.UseAuthorization();
 
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("Content-Security-Policy",
+        "default-src 'self'; font-src 'self' https://assets.ngrok.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'");
+    await next();
+});
+
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-app.Run();
+app.Run("https://0.0.0.0:7000");

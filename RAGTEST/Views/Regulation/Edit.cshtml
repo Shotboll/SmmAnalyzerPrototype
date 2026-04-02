@@ -1,0 +1,35 @@
+﻿@using SmmAnalyzerPrototype.Data.Models.DTO.Regualtion
+@model UpdateRegulationRequest
+
+@{
+    var id = ViewBag.Id;
+}
+
+<h2>Редактировать регламент</h2>
+
+<form asp-action="Edit" method="post">
+    <input type="hidden" name="id" value="@id" />
+    <div class="mb-3">
+        <label asp-for="Title" class="form-label">Название</label>
+        <input asp-for="Title" class="form-control" />
+        <span asp-validation-for="Title" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Content" class="form-label">Текст регламента</label>
+        <textarea asp-for="Content" class="form-control" rows="10"></textarea>
+        <span asp-validation-for="Content" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Category" class="form-label">Категория</label>
+        <input asp-for="Category" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label asp-for="CommunityId" class="form-label">Сообщество</label>
+        <select asp-for="CommunityId" asp-items="@(ViewBag.Communities)" class="form-select">
+            <option value="">-- Выберите сообщество --</option>
+        </select>
+        <span asp-validation-for="CommunityId" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Сохранить</button>
+    <a asp-action="Index" class="btn btn-secondary">Отмена</a>
+</form>

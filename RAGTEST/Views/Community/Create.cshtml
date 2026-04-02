@@ -1,0 +1,29 @@
+﻿@using SmmAnalyzerPrototype.Data.Models.DTO
+@using SmmAnalyzerPrototype.Data.Models.DTO.Community
+@model CreateCommunityRequest
+
+<h2>Создать сообщество</h2>
+
+<form asp-action="Create" method="post">
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label">Название</label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="TargetAudience" class="form-label">Целевая аудитория</label>
+        <input asp-for="TargetAudience" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label asp-for="StyleProfile" class="form-label">Стиль общения</label>
+        <input asp-for="StyleProfile" class="form-control" />
+    </div>
+    <button type="submit" class="btn btn-primary">Создать</button>
+    <a asp-action="Index" class="btn btn-secondary">Отмена</a>
+</form>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

@@ -1,0 +1,6 @@
+@SmmAnalyzerPrototype.Api_HostAddress = http://localhost:5041
+
+GET {{SmmAnalyzerPrototype.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

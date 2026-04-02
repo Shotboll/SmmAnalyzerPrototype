@@ -1,0 +1,29 @@
+﻿@* @using SmmAnalyzerPrototype.Data.Models.DTO*@
+@model PostCreateModel
+
+<h2>Проверка стиля</h2>
+
+@if (ViewBag.Error != null)
+{
+    <div class="alert alert-danger">@ViewBag.Error</div>
+}
+@if (ViewBag.StyleResult != null)
+{
+    <div class="alert alert-info" style="white-space: pre-wrap; font-family: monospace;">@ViewBag.StyleResult</div>
+}
+
+<form method="post">
+    <div class="mb-3">
+        <label asp-for="CommunityId" class="form-label"></label>
+        <select asp-for="CommunityId" name="CommunityId" asp-items="@(new SelectList(Model.Communities, "Id", "Name"))" class="form-select">
+            <option value="">-- Выберите сообщество --</option>
+        </select>
+        <span asp-validation-for="CommunityId" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Текст поста</label>
+        <textarea name="Text" class="form-control" rows="20">@Model?.Text</textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Проверить стиль</button>
+</form>

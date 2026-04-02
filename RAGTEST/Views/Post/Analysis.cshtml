@@ -1,0 +1,138 @@
+﻿@model RAGTEST.Models.GrammarAnalysisPageModel
+
+@{
+    ViewData["Title"] = "Результаты проверки текста";
+}
+
+<div class="container analysis-page mt-4">
+    <h2 class="mb-4">Результаты проверки текста</h2>
+
+    @if (!Model.Cards.Any() && !Model.SuspiciousCards.Any())
+    {
+        <div class="empty-state">
+            Ошибок не найдено.
+        </div>
+    }
+
+    @if (Model.Cards.Any())
+    {
+        <div class="mb-4">
+            <div class="section-title text-danger">
+                Найденные ошибки
+            </div>
+
+            <div class="result-list">
+                @foreach (var card in Model.Cards)
+                {
+                    <div class="result-card">
+                        <div class="result-top">
+                            <h5 class="result-type">
+                                Ошибка
+                            </h5>
+                            <span class="type-badge">@card.Type</span>
+                        </div>
+
+                        <div class="result-main">
+                            <div class="result-block">
+                                <div class="result-label">Фрагмент</div>
+                                <div class="result-text old">@card.Original</div>
+                            </div>
+
+                            <div class="result-arrow">→</div>
+
+                            <div class="result-block">
+                                <div class="result-label">Исправление</div>
+                                <div class="result-text new">@card.Correction</div>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(card.Explanation) || !string.IsNullOrWhiteSpace(card.Hint))
+                        {
+                            <div class="result-meta">
+                                @if (!string.IsNullOrWhiteSpace(card.Explanation))
+                                {
+                                    <p class="meta-line">
+                                        <span class="meta-title">Почему:</span> @card.Explanation
+                                    </p>
+                                }
+
+                                @if (!string.IsNullOrWhiteSpace(card.Hint))
+                                {
+                                    <p class="meta-line">
+                                        <span class="meta-title">Подсказка:</span> @card.Hint
+                                    </p>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (Model.SuspiciousCards.Any())
+    {
+        <div class="mb-4">
+            <div class="section-title text-warning">
+                Сомнительные замечания
+            </div>
+
+            <div class="summary-note warning-note">
+                Эти замечания стоит проверить вручную.
+            </div>
+
+            <div class="result-list">
+                @foreach (var card in Model.SuspiciousCards)
+                {
+                    <div class="result-card warning">
+                        <div class="result-top">
+                            <h5 class="result-type">
+                                Возможная ошибка
+                            </h5>
+                            <span class="type-badge">@card.Type</span>
+                        </div>
+
+                        <div class="result-main">
+                            <div class="result-block">
+                                <div class="result-label">Фрагмент</div>
+                                <div class="result-text">@card.Original</div>
+                            </div>
+
+                            <div class="result-arrow">→</div>
+
+                            <div class="result-block">
+                                <div class="result-label">Возможное исправление</div>
+                                <div class="result-text new">
+                                    @(string.IsNullOrWhiteSpace(card.Correction) ? "—" : card.Correction)
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(card.Explanation) || !string.IsNullOrWhiteSpace(card.Hint))
+                        {
+                            <div class="result-meta">
+                                @if (!string.IsNullOrWhiteSpace(card.Explanation))
+                                {
+                                    <p class="meta-line">
+                                        <span class="meta-title">Комментарий:</span> @card.Explanation
+                                    </p>
+                                }
+
+                                @if (!string.IsNullOrWhiteSpace(card.Hint))
+                                {
+                                    <p class="meta-line">
+                                        <span class="meta-title">Подсказка:</span> @card.Hint
+                                    </p>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="page-actions">
+        <a asp-action="Create" class="btn btn-primary">Проверить другой текст</a>
+    </div>
+</div>

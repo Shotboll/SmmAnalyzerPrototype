@@ -1,0 +1,30 @@
+﻿@model PostCreateModel
+
+<h2>Новый пост</h2>
+
+@if (ViewBag.Error != null)
+{
+    <div class="alert alert-danger">@ViewBag.Error</div>
+}
+
+<form asp-action="Create" method="post">
+    <div class="mb-3">
+        <label asp-for="CommunityId" class="form-label"></label>
+        <select asp-for="CommunityId" asp-items="@(new SelectList(Model.Communities, "Id", "Name"))" class="form-select">
+            <option value="">-- Выберите сообщество --</option>
+        </select>
+        <span asp-validation-for="CommunityId" class="text-danger"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Text" class="form-label"></label>
+        <textarea asp-for="Text" class="form-control" rows="20"></textarea>
+        <span asp-validation-for="Text" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Анализировать</button>
+</form>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}
