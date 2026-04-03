@@ -29,7 +29,7 @@ namespace SmmAnalyzerPrototype.Api.Services
             var options = mode switch
             {
                 LlmMode.Strict => new { temperature = 0.1, top_p = 0.1, num_predict = 500, num_ctx = 4096 },
-                LlmMode.RAG => new { temperature = 0.1, top_p = 0.2, num_predict = 500, num_ctx = 4096 },
+                LlmMode.RAG => new { temperature = 0.1, top_p = 0.2, num_predict = 1500, num_ctx = 4096 },
                 LlmMode.Creative => new { temperature = 0.8, top_p = 0.9, num_predict = 700, num_ctx = 4096 },
                 _ => new { temperature = 0.0, top_p = 0.1, num_predict = 500, num_ctx = 4096 }
             };
@@ -78,83 +78,207 @@ namespace SmmAnalyzerPrototype.Api.Services
 
             var chunks = await _context.RegulationChunks
                 .FromSqlRaw(@"
-                    SELECT c.*
-                    FROM regulation_chunks c
-                    INNER JOIN regulation_documents d ON c.""RegulationId"" = d.""Id""
-                    WHERE d.""CommunityId"" = {0}
-                    ORDER BY c.embedding <=> {1}::vector
-                    LIMIT {2}
-                ", communityId, normalizedQuery, topK)
-                .ToListAsync(); ;
+            SELECT c.*
+            FROM regulation_chunks c
+            INNER JOIN regulation_documents d ON c.""RegulationId"" = d.""Id""
+            WHERE d.""CommunityId"" = {0}
+            ORDER BY c.embedding <=> {1}::vector
+            LIMIT {2}
+        ", communityId, normalizedQuery, topK)
+                .ToListAsync();
 
             var contextText = string.Join("\n\n", chunks.Select((x, i) =>
-                $"Правило {i + 1} (\n{x.ChunkText}"
+                $"[Правило {i + 1}]\n{x.ChunkText}"
             ));
 
             var prompt = $@"
-                Ты — модератор контента. Ниже приведены правила сообщества:
+                Ты — модератор контента сообщества.
 
+                Ниже приведены правила сообщества:
                 {contextText}
 
-                Пост:
+                Пост для проверки:
                 {postText}
 
-                Определи, нарушает ли пост эти правила. Отвечай ТОЛЬКО в формате JSON:
+                Определи, нарушает ли пост правила.
+
+                Верни ответ ТОЛЬКО в формате JSON:
 
                 {{
-                  ""hasViolations"": true/false,
+                  ""hasViolations"": true,
                   ""violations"": [
                     {{
-                      ""ruleNumber"": <номер правила>,
-                      ""ruleText"": ""<текст правила>"",
-                      ""explanation"": ""<почему нарушает>""
+                      ""ruleNumber"": 1,
+                      ""ruleShort"": ""<краткое название правила>"",
+                      ""matchedText"": ""фрагмент поста, который нарушает правило"",
+                      ""explanation"": ""краткое объяснение причины нарушения""
                     }}
                   ],
-                  ""comment"": ""<общий комментарий или 'Нет нарушений'>""
+                  ""comment"": ""краткий общий вывод""
                 }}
 
-                ВАЖНО:
-                1. Если пост не нарушает правил, верни:
-                   {{
-                     ""hasViolations"": false,
-                     ""violations"": [],
-                     ""comment"": ""Нет нарушений""
-                   }}
-                2. Не придумывай нарушения там, где их нет.
-                3. Применяй правила строго, буквально.
-                4. Ответ должен быть валидным JSON, без лишнего текста.
+                Если нарушений нет, верни строго:
+                {{
+                  ""hasViolations"": false,
+                  ""violations"": [],
+                  ""comment"": ""Нарушений не найдено""
+                }}
+
+                Требования:
+                1. Не придумывай нарушения, если их нет.
+                2. Указывай только те правила, которые действительно относятся к посту.
+                3. Для каждого нарушения обязательно укажи matchedText — короткий фрагмент из поста.
+                4. explanation должен быть коротким, деловым и понятным.
+                5. Если одно и то же нарушение уже описано, не дублируй его.
+                6. Ответ должен быть валидным JSON без markdown, без пояснений и без лишнего текста.
                 ";
 
             string response = await CallLlmAsync(prompt, LlmMode.RAG);
 
-            // Удаляем возможную markdown-обёртку
-            var jsonStart = response.IndexOf("```json");
-            if (jsonStart != -1)
-            {
-                jsonStart += 7; // длина "```json"
-                var jsonEnd = response.IndexOf("```", jsonStart);
-                if (jsonEnd != -1)
-                {
-                    response = response.Substring(jsonStart, jsonEnd - jsonStart).Trim();
-                }
-            }
-            else
-            {
-                // Если нет обёртки, но есть просто "```", тоже удаляем
-                var simpleStart = response.IndexOf("```");
-                if (simpleStart != -1)
-                {
-                    simpleStart += 3;
-                    var simpleEnd = response.IndexOf("```", simpleStart);
-                    if (simpleEnd != -1)
-                    {
-                        response = response.Substring(simpleStart, simpleEnd - simpleStart).Trim();
-                    }
-                }
-            }
+            response = ExtractJson(response);
 
             return response;
         }
+
+        private static string ExtractJson(string response)
+        {
+            if (string.IsNullOrWhiteSpace(response))
+                return "[]";
+
+            response = response.Trim();
+
+            // 1. Сначала пробуем извлечь JSON из markdown-блока ```json ... ```
+            var fencedJson = ExtractFromCodeFence(response, "json");
+            if (!string.IsNullOrWhiteSpace(fencedJson))
+                return fencedJson;
+
+            // 2. Потом пробуем извлечь из обычного блока ``` ... ```
+            var fencedCode = ExtractFromCodeFence(response, null);
+            if (!string.IsNullOrWhiteSpace(fencedCode) && LooksLikeJson(fencedCode))
+                return fencedCode;
+
+            // 3. Если модель добавила пояснения вроде "Формат ответа:"
+            //    ищем первый полноценный JSON-объект или массив в тексте
+            var embeddedJson = ExtractFirstJsonObjectOrArray(response);
+            if (!string.IsNullOrWhiteSpace(embeddedJson))
+                return embeddedJson;
+
+            // 4. Если вдруг весь ответ уже похож на JSON
+            if (LooksLikeJson(response))
+                return response;
+
+            // 5. Безопасный fallback
+            return "[]";
+        }
+
+        private static string? ExtractFromCodeFence(string text, string? language)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
+
+            string openingFence = language == null ? "```" : $"```{language}";
+            int start = text.IndexOf(openingFence, StringComparison.OrdinalIgnoreCase);
+            if (start < 0)
+                return null;
+
+            start += openingFence.Length;
+
+            // пропускаем возможный перевод строки после ```json
+            while (start < text.Length && (text[start] == '\r' || text[start] == '\n'))
+                start++;
+
+            int end = text.IndexOf("```", start, StringComparison.OrdinalIgnoreCase);
+            if (end <= start)
+                return null;
+
+            var content = text.Substring(start, end - start).Trim();
+            return content;
+        }
+
+        private static bool LooksLikeJson(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+
+            text = text.Trim();
+            return (text.StartsWith("{") && text.EndsWith("}")) ||
+                   (text.StartsWith("[") && text.EndsWith("]"));
+        }
+
+        private static string? ExtractFirstJsonObjectOrArray(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return null;
+
+            int objectStart = text.IndexOf('{');
+            int arrayStart = text.IndexOf('[');
+
+            int start;
+            char openChar;
+            char closeChar;
+
+            if (objectStart == -1 && arrayStart == -1)
+                return null;
+
+            if (objectStart == -1 || (arrayStart != -1 && arrayStart < objectStart))
+            {
+                start = arrayStart;
+                openChar = '[';
+                closeChar = ']';
+            }
+            else
+            {
+                start = objectStart;
+                openChar = '{';
+                closeChar = '}';
+            }
+
+            var sb = new StringBuilder();
+            int depth = 0;
+            bool inString = false;
+            bool escape = false;
+
+            for (int i = start; i < text.Length; i++)
+            {
+                char c = text[i];
+                sb.Append(c);
+
+                if (escape)
+                {
+                    escape = false;
+                    continue;
+                }
+
+                if (c == '\\' && inString)
+                {
+                    escape = true;
+                    continue;
+                }
+
+                if (c == '"')
+                {
+                    inString = !inString;
+                    continue;
+                }
+
+                if (inString)
+                    continue;
+
+                if (c == openChar)
+                {
+                    depth++;
+                }
+                else if (c == closeChar)
+                {
+                    depth--;
+                    if (depth == 0)
+                        return sb.ToString().Trim();
+                }
+            }
+
+            return null;
+        }
+
 
         public async Task<List<GrammarExplanationDto>> ExplainGrammarErrorsAsync(string originalText, List<GrammarErrorDto> rawErrors)
         {
@@ -199,7 +323,7 @@ namespace SmmAnalyzerPrototype.Api.Services
                 """;
 
             var rawResponse = await CallLlmAsync(prompt, LlmMode.Strict);
-            rawResponse = ExtractJson(rawResponse);
+            rawResponse = ExtractJsonGrammar(rawResponse);
 
             try
             {
@@ -217,7 +341,7 @@ namespace SmmAnalyzerPrototype.Api.Services
             }
         }
 
-        private static string ExtractJson(string response)
+        private static string ExtractJsonGrammar(string response)
         {
             if (string.IsNullOrWhiteSpace(response))
                 return "[]";
@@ -243,25 +367,66 @@ namespace SmmAnalyzerPrototype.Api.Services
             return response.Trim();
         }
 
-        public async Task<string> StyleCheck(string audience, string style, string text)
+        public async Task<StyleCheckResultDto> StyleCheck(string audience, string style, string text)
         {
-            var prompt = $@"
-                    Ты — стилист текстов для социальных сетей. Оцени, соответствует ли данный пост стилю и целевой аудитории. Не обращай внимания на Орфографию и пунктуацию
+            var prompt = $$"""
+                Ты — эксперт по стилю текстов для социальных сетей.
 
-                    Целевая аудитория: {audience}
-                    Желаемый стиль: {style}
+                Проанализируй, насколько текст подходит под указанную аудиторию и стиль.
+                Не оценивай орфографию и пунктуацию.
+                Не пиши пример нового готового текста.
+                Нужен только анализ и рекомендации.
 
-                    Текст поста: ""{text}""
+                Целевая аудитория: {{audience}}
+                Желаемый стиль: {{style}}
+                Текст поста: "{{text}}"
 
-                    Дай развёрнутый ответ в свободной форме:
-                    - Соответствует ли стиль аудитории? (да/нет/частично)
-                    - Если нет или частично, что именно не так?
-                    - Как можно улучшить текст, чтобы он лучше подходил?
+                Верни ответ СТРОГО в формате JSON без markdown и без пояснений:
 
-                    Не пиши пример готового текста. Хватит только рекомендаций.
-                ";
+                {
+        
+                          "assessment": "соответствует",
+                  "summary": "Краткий общий вывод",
+                  "strengths": [
+                    "Сильная сторона 1",
+                    "Сильная сторона 2"
+                  ],
+                  "issues": [
+                    "Проблема 1",
+                    "Проблема 2"
+                  ],
+                  "recommendations": [
+                    "Рекомендация 1",
+                    "Рекомендация 2",
+                    "Рекомендация 3"
+                  ]
+                }
 
-            return await CallLlmAsync(prompt, LlmMode.Strict);
+                Допустимые значения поля assessment:
+                - соответствует
+                - частично соответствует
+                - не соответствует
+                """;
+
+            var rawResponse = await CallLlmAsync(prompt, LlmMode.Strict);
+
+            var json = ExtractJson(rawResponse);
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+            var result = JsonSerializer.Deserialize<StyleCheckResultDto>(json, options);
+
+            return result ?? new StyleCheckResultDto
+            {
+                Assessment = "не удалось определить",
+                Summary = "Не удалось корректно обработать ответ модели.",
+                Strengths = new List<string>(),
+                Issues = new List<string>(),
+                Recommendations = new List<string>()
+            };
         }
     }
 }

@@ -28,6 +28,65 @@ namespace RAGTEST.Controllers
             return View(model);
         }
 
+        // GET: /Post/RegulationCheck
+        public async Task<IActionResult> RegulationCheck()
+        {
+            var communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall") ?? new();
+
+            var model = new RegulationCheckPageModel
+            {
+                Communities = communities
+            };
+
+            return View(model);
+        }
+
+        // POST: /Post/RegulationCheck
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RegulationCheck(RegulationCheckPageModel model)
+        {
+            model.Communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall") ?? new();
+
+            if (model.CommunityId == Guid.Empty)
+            {
+                ModelState.AddModelError(nameof(model.CommunityId), "Выберите сообщество.");
+            }
+
+            if (string.IsNullOrWhiteSpace(model.Text))
+            {
+                ModelState.AddModelError(nameof(model.Text), "Введите текст поста.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            var request = new AnalyzePostRequest
+            {
+                CommunityId = model.CommunityId,
+                Text = model.Text
+            };
+
+            var response = await _client.PostAsJsonAsync("api/postapi/AnalyzePost", request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                ViewBag.Error = "Ошибка при проверке по регламентам.";
+                return View(model);
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<AnalyzePostResponse>();
+
+            model.HasResult = true;
+            model.HasViolations = result?.HasViolations ?? false;
+            model.Comment = result?.Comment ?? string.Empty;
+            model.Violations = result?.Violations ?? new List<ViolationDto>();
+
+            return View(model);
+        }
+
         // POST: /Post/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -83,43 +142,73 @@ namespace RAGTEST.Controllers
         }
 
         // GET: /Post/StyleCheck
+        [HttpGet]
         public async Task<IActionResult> StyleCheck()
         {
             var communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall") ?? new();
 
-            var model = new PostCreateModel
+            var model = new StyleCheckPageModel
             {
                 Communities = communities
             };
+
             return View(model);
         }
 
-        // POST: /Post/StyleCheck
         [HttpPost]
-        public async Task<IActionResult> StyleCheck(PostCreateModel model)
+        public async Task<IActionResult> StyleCheck(StyleCheckPageModel model)
         {
             var communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall") ?? new();
+            model.Communities = communities;
 
-            var community = communities.Where(a => a.Id == model.CommunityId).First();
+            if (!ModelState.IsValid)
+                return View(model);
 
-            var request = new StyleCheckRequest()
+            var community = communities.FirstOrDefault(c => c.Id == model.CommunityId);
+            if (community == null)
             {
-                Audience = community.TargetAudience!,
-                Style = community.StyleProfile!,
+                model.ErrorMessage = "Выбранное сообщество не найдено.";
+                return View(model);
+            }
+
+            var request = new StyleCheckRequest
+            {
+                Audience = community.TargetAudience ?? string.Empty,
+                Style = community.StyleProfile ?? string.Empty,
                 Text = model.Text
             };
 
-            model.Communities = communities;
-
             var response = await _client.PostAsJsonAsync("api/postapi/CheckStyle", request);
-            if (response.IsSuccessStatusCode)
+
+            if (!response.IsSuccessStatusCode)
             {
-                ViewBag.StyleResult = response.Content.ReadAsStringAsync().Result;
+                model.ErrorMessage = "Ошибка при проверке стиля.";
+                return View(model);
             }
-            else
+
+            var rawJson = await response.Content.ReadAsStringAsync();
+
+            try
             {
-                ViewBag.Error = "Ошибка при проверке стиля";
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+                var result = JsonSerializer.Deserialize<StyleCheckResultDto>(rawJson, options);
+                if (result == null)
+                {
+                    model.ErrorMessage = "Не удалось обработать результат анализа.";
+                    return View(model);
+                }
+
+                model.Result = result;
             }
+            catch
+            {
+                model.ErrorMessage = "Модель вернула некорректный ответ.";
+            }
+
             return View(model);
         }
     }

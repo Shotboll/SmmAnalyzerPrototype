@@ -1,0 +1,126 @@
+﻿@model RAGTEST.Models.RegulationCheckPageModel
+
+@{
+    ViewData["Title"] = "Проверка по регламентам";
+}
+
+<div class="container reg-page mt-4">
+    <h2 class="mb-2">Проверка поста по регламентам</h2>
+    <div class="page-subtitle">
+        Система проверяет текст по правилам выбранного сообщества и показывает найденные нарушения.
+    </div>
+
+    <div class="editor-card">
+        <form asp-action="RegulationCheck" method="post">
+            @Html.AntiForgeryToken()
+
+            <div class="mb-3">
+                <label asp-for="CommunityId" class="form-label">Сообщество</label>
+                <select asp-for="CommunityId" class="form-select">
+                    <option value="">Выберите сообщество</option>
+                    @foreach (var community in Model.Communities)
+                    {
+                        <option value="@community.Id">@community.Name</option>
+                    }
+                </select>
+                <span asp-validation-for="CommunityId" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Text" class="form-label">Текст поста</label>
+                <textarea asp-for="Text" class="form-control" placeholder="Введите текст поста для проверки..."></textarea>
+                <span asp-validation-for="Text" class="text-danger"></span>
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="submit" class="btn btn-primary">Проверить</button>
+                <a asp-action="RegulationCheck" class="btn btn-outline-secondary">Очистить</a>
+            </div>
+        </form>
+    </div>
+
+    @if (ViewBag.Error != null)
+    {
+        <div class="alert alert-danger mt-4">
+            @ViewBag.Error
+        </div>
+    }
+
+    @if (Model.HasResult)
+    {
+        <div class="result-card">
+            <div class="result-status @(Model.HasViolations ? "bad" : "ok")">
+                @(Model.HasViolations ? "Обнаружены нарушения" : "Нарушений не найдено")
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(Model.Comment))
+            {
+                <p class="result-comment">@Model.Comment</p>
+            }
+
+            @if (Model.Violations.Any())
+            {
+                <div class="violations-list">
+                    @foreach (var item in Model.Violations)
+                    {
+                        <div class="violation-item">
+                            <div class="violation-row">
+                                <div>
+                                    <div class="rule-chip">Правило @item.RuleNumber</div>
+                                </div>
+
+                                <div class="violation-content">
+                                    <h5 class="violation-title">Нарушение регламента</h5>
+
+                                    <div class="field-group">
+                                        <div class="field-label">Фрагмент поста</div>
+                                        <div class="field-text">
+                                            <span class="matched-inline">
+                                                @(string.IsNullOrWhiteSpace(item.MatchedText) ? "Не указан" : item.MatchedText)
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    @if (!string.IsNullOrWhiteSpace(item.Explanation))
+                                    {
+                                        <div class="field-group">
+                                            <div class="field-label">Причина</div>
+                                            <p class="field-text">@item.Explanation</p>
+                                        </div>
+                                    }
+
+                                    @if (!string.IsNullOrWhiteSpace(item.RuleShort))
+                                    {
+                                        <div class="field-group">
+                                            <div class="field-label">Основание</div>
+                                            <p class="field-text rule-text">@item.RuleShort</p>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="empty-state">
+            Результаты проверки появятся здесь после отправки текста.
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.querySelector("form")?.addEventListener("submit", function () {
+            const btn = document.getElementById("submitBtn");
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = "Проверка...";
+            }
+        });
+    </script>
+}

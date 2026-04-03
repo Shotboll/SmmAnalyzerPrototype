@@ -27,4 +27,14 @@
     @{
         await Html.RenderPartialAsync("_ValidationScriptsPartial");
     }
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.querySelector("form")?.addEventListener("submit", function () {
+            const btn = document.getElementById("submitBtn");
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = "Проверка...";
+            }
+        });
+    </script>
 }

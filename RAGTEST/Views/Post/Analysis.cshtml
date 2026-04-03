@@ -136,3 +136,16 @@
         <a asp-action="Create" class="btn btn-primary">Проверить другой текст</a>
     </div>
 </div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.querySelector("form")?.addEventListener("submit", function () {
+            const btn = document.getElementById("submitBtn");
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = "Проверка...";
+            }
+        });
+    </script>
+}

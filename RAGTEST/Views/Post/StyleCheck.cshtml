@@ -1,29 +1,179 @@
-﻿@* @using SmmAnalyzerPrototype.Data.Models.DTO*@
-@model PostCreateModel
+﻿@model StyleCheckPageModel
 
-<h2>Проверка стиля</h2>
-
-@if (ViewBag.Error != null)
-{
-    <div class="alert alert-danger">@ViewBag.Error</div>
-}
-@if (ViewBag.StyleResult != null)
-{
-    <div class="alert alert-info" style="white-space: pre-wrap; font-family: monospace;">@ViewBag.StyleResult</div>
+@{
+    ViewData["Title"] = "Проверка стиля";
 }
 
-<form method="post">
-    <div class="mb-3">
-        <label asp-for="CommunityId" class="form-label"></label>
-        <select asp-for="CommunityId" name="CommunityId" asp-items="@(new SelectList(Model.Communities, "Id", "Name"))" class="form-select">
-            <option value="">-- Выберите сообщество --</option>
-        </select>
-        <span asp-validation-for="CommunityId" class="text-danger"></span>
+<div class="container py-4">
+    <div class="mb-4">
+        <h1 class="fw-bold mb-2">Проверка стиля текста</h1>
+        <p class="text-muted mb-0">
+            Оценка соответствия поста целевой аудитории и стилю выбранного сообщества.
+        </p>
     </div>
 
-    <div class="mb-3">
-        <label class="form-label">Текст поста</label>
-        <textarea name="Text" class="form-control" rows="20">@Model?.Text</textarea>
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger shadow-sm border-0 rounded-4">
+            @Model.ErrorMessage
+        </div>
+    }
+
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <div class="card shadow-sm border-0 rounded-4">
+                <div class="card-body p-4">
+                    <h4 class="card-title mb-4">Параметры анализа</h4>
+
+                    <form asp-action="StyleCheck" method="post" novalidate>
+                        <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                        <div class="mb-3">
+                            <label asp-for="CommunityId" class="form-label fw-semibold">Сообщество</label>
+                            <select asp-for="CommunityId" class="form-select rounded-3">
+                                <option value="">Выберите сообщество</option>
+                                @foreach (var community in Model.Communities)
+                                {
+                                    <option value="@community.Id">
+                                        @community.Name
+                                    </option>
+                                }
+                            </select>
+                            <span asp-validation-for="CommunityId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Text" class="form-label fw-semibold">Текст поста</label>
+                            <textarea asp-for="Text" class="form-control rounded-3" rows="12"
+                                      placeholder="Введите текст поста для анализа"></textarea>
+                            <span asp-validation-for="Text" class="text-danger small"></span>
+                            <div class="form-text">Максимум 5000 символов.</div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg rounded-3">
+                                Проверить стиль
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card shadow-sm border-0 rounded-4 h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <h4 class="card-title mb-0">Результат анализа</h4>
+
+                        @if (Model.Result != null)
+                        {
+                            var badgeClass = Model.Result.Assessment?.ToLower() switch
+                            {
+                                "соответствует" => "bg-success-subtle text-success",
+                                "частично соответствует" => "bg-warning-subtle text-warning",
+                                "не соответствует" => "bg-danger-subtle text-danger",
+                                _ => "bg-secondary-subtle text-secondary"
+                            };
+
+                            <span class="badge rounded-pill px-3 py-2 @badgeClass">
+                                @Model.Result.Assessment
+                            </span>
+                        }
+                    </div>
+
+                    @if (Model.Result != null)
+                    {
+                        <div class="mb-4">
+                            <div class="p-3 bg-light rounded-4 border">
+                                <div class="fw-semibold mb-2">Общий вывод</div>
+                                <div>@Model.Result.Summary</div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="border rounded-4 p-3 h-100 bg-white">
+                                    <h5 class="mb-3">Сильные стороны</h5>
+                                    @if (Model.Result.Strengths.Any())
+                                    {
+                                        <ul class="mb-0 ps-3">
+                                            @foreach (var item in Model.Result.Strengths)
+                                            {
+                                                <li class="mb-2">@item</li>
+                                            }
+                                        </ul>
+                                    }
+                                    else
+                                    {
+                                        <p class="text-muted mb-0">Сильные стороны не выделены.</p>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="border rounded-4 p-3 h-100 bg-white">
+                                    <h5 class="mb-3">Что можно улучшить</h5>
+                                    @if (Model.Result.Issues.Any())
+                                    {
+                                        <ul class="mb-0 ps-3">
+                                            @foreach (var item in Model.Result.Issues)
+                                            {
+                                                <li class="mb-2">@item</li>
+                                            }
+                                        </ul>
+                                    }
+                                    else
+                                    {
+                                        <p class="text-muted mb-0">Явных проблем не найдено.</p>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <div class="border rounded-4 p-3 bg-white">
+                                    <h5 class="mb-3">Рекомендации</h5>
+                                    @if (Model.Result.Recommendations.Any())
+                                    {
+                                        <ol class="mb-0 ps-3">
+                                            @foreach (var item in Model.Result.Recommendations)
+                                            {
+                                                <li class="mb-2">@item</li>
+                                            }
+                                        </ol>
+                                    }
+                                    else
+                                    {
+                                        <p class="text-muted mb-0">Рекомендации не были сформированы.</p>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex align-items-center justify-content-center h-100">
+                            <div class="text-center text-muted py-5">
+                                <div class="fs-5 fw-semibold mb-2">Пока нет результата</div>
+                                <div>Выберите сообщество, введите текст и запустите анализ.</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
     </div>
-    <button type="submit" class="btn btn-primary">Проверить стиль</button>
-</form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.querySelector("form")?.addEventListener("submit", function () {
+            const btn = document.getElementById("submitBtn");
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = "Проверка...";
+            }
+        });
+    </script>
+}

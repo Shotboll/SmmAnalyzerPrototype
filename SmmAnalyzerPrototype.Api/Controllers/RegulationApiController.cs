@@ -5,6 +5,7 @@ using SmmAnalyzerPrototype.Api.Services;
 using SmmAnalyzerPrototype.Data.Data;
 using SmmAnalyzerPrototype.Data.Models;
 using SmmAnalyzerPrototype.Data.Models.DTO.Regualtion;
+using System.Text.RegularExpressions;
 
 namespace SmmAnalyzerPrototype.Api.Controllers
 {
@@ -143,13 +144,15 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 }
 
                 // 2. Длинный абзац — разбиваем по предложениям
-                var sentences = trimmedParagraph.Split(new[] { '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries);
+                var sentences = Regex.Split(trimmedParagraph, @"(?<=[.!?])\s+")
+                    .Where(s => !string.IsNullOrWhiteSpace(s))
+                    .ToArray();
                 var currentChunk = new List<string>();
                 int currentLength = 0;
 
                 foreach (var sentence in sentences)
                 {
-                    var trimmedSentence = sentence.Trim() + ".";
+                    var trimmedSentence = sentence.Trim();
                     if (trimmedSentence.Length > chunkSize)
                     {
                         // Очень длинное предложение – принудительно разбиваем по словам

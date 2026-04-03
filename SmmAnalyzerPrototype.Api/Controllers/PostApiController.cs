@@ -23,11 +23,47 @@ namespace SmmAnalyzerPrototype.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<AnalyzePostResponse>> AnalyzePost([FromBody] AnalyzePostRequest request)
         {
+            if (request == null || request.CommunityId == Guid.Empty || string.IsNullOrWhiteSpace(request.Text))
+            {
+                return BadRequest(new AnalyzePostResponse
+                {
+                    HasViolations = false,
+                    Violations = new List<ViolationDto>(),
+                    Comment = "Некорректные входные данные."
+                });
+            }
+
             var resultJson = await _llmService.AnalyzePostWithRagAsync(request.Text, request.CommunityId);
 
             try
             {
-                var response = JsonSerializer.Deserialize<AnalyzePostResponse>(resultJson);
+                var response = JsonSerializer.Deserialize<AnalyzePostResponse>(resultJson, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (response == null)
+                {
+                    return Ok(new AnalyzePostResponse
+                    {
+                        HasViolations = false,
+                        Violations = new List<ViolationDto>(),
+                        Comment = "Не удалось обработать результат проверки."
+                    });
+                }
+
+                response.Violations ??= new List<ViolationDto>();
+                response.Comment ??= response.HasViolations
+                    ? "Обнаружены возможные нарушения."
+                    : "Нарушений не найдено.";
+
+                foreach (var violation in response.Violations)
+                {
+                    violation.RuleShort ??= string.Empty;
+                    violation.MatchedText ??= string.Empty;
+                    violation.Explanation ??= string.Empty;
+                }
+
                 return Ok(response);
             }
             catch
@@ -36,7 +72,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 {
                     HasViolations = false,
                     Violations = new List<ViolationDto>(),
-                    Comment = "Ошибка парсинга ответа модели. Сырой ответ: " + resultJson
+                    Comment = "Не удалось корректно обработать ответ модели. Попробуйте повторить проверку."
                 });
             }
         }
@@ -91,7 +127,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<string>> CheckStyle([FromBody] StyleCheckRequest request)
+        public async Task<ActionResult<StyleCheckResultDto>> CheckStyle([FromBody] StyleCheckRequest request)
         {
             var result = await _llmService.StyleCheck(request.Audience, request.Style, request.Text);
             return Ok(result);
