@@ -142,8 +142,17 @@ namespace SmmAnalyzerPrototype.Api.Services
                 {postText}
 
                 Задача:
-                - Найти только явные нарушения правил.
-                - Указывать matchedText только как точную короткую цитату из поста.
+                Определи, есть ли в посте ЯВНЫЕ нарушения правил.
+
+                Критически важные правила:
+                1. Не додумывай скрытый смысл.
+                2. Не интерпретируй нейтральные деловые, технические или информационные формулировки как нарушение.
+                3. Нарушение фиксируется только тогда, когда в тексте есть прямой и явный признак нарушения правила.
+                4. Формулировки вида "может восприниматься как", "похоже на", "можно трактовать как", "косвенно указывает на" запрещены.
+                5. Если нарушение нельзя подтвердить точной цитатой из поста и прямой связью с текстом правила — нарушения нет.
+                6. Обычное описание процессов, технологий, тестирования, качества, разработки, публикации, анализа, автоматизации и проверки не является мошенничеством, обманом, манипуляцией или рекламой само по себе.
+                7. Если текст просто описывает рабочий процесс, опыт, технологию или внутреннюю практику, это не нарушение.
+                
                 
 
                 Заполни JSON строго по заданной схеме.
@@ -293,6 +302,101 @@ namespace SmmAnalyzerPrototype.Api.Services
             }
 
             return null;
+        }
+
+        public async Task<ExplainGrammarItemResponse> ExplainSingleGrammarErrorAsync(ExplainGrammarItemRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Fragment))
+            {
+                return new ExplainGrammarItemResponse
+                {
+                    Explanation = "Не удалось определить ошибку.",
+                    Hint = "Проверьте этот фрагмент вручную."
+                };
+            }
+
+            var promptObject = new
+            {
+                sentence = request.Sentence,
+                fragment = request.Fragment,
+                suggestion = request.Suggestion,
+                type = request.Type,
+                message = request.Message
+            };
+
+            var promptJson = JsonSerializer.Serialize(promptObject, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            });
+
+            var prompt = $$"""
+                Ты — помощник редактора русского текста.
+
+                Тебе передана ОДНА уже найденная ошибка.
+                Ошибка уже определена внешним инструментом.
+                Твоя задача — не искать новую ошибку, а кратко и понятно объяснить пользователю, что не так и как исправить.
+
+                Очень важные правила:
+                1. Объясняй ТОЛЬКО на основе полей fragment, suggestion, type, message.
+                2. Не придумывай новые причины ошибки.
+                3. Не анализируй слово по буквам, если это прямо не следует из данных.
+                4. Не пиши ложных утверждений вроде "вместо буквы X должна быть Y", если этого нельзя надёжно вывести.
+
+                6. Если есть suggestion, совет должен опираться на него.
+                
+                8. Не добавляй ничего вне JSON.
+
+                fragment - ЭТО МЕСТО ГДЕ НАХОДИТЬСЯ ОШИБКА
+                suggestion - ЭТО ИСПРАВЛЕНИЕ ЭТОЙ ОШИБКИ
+                message - ЭТО МИНИ ОБЪЯСНЕНИЕ ОШИБКИ
+                sentence - ЭТО ПРЕДЛОЖЕНИЕ В КОТОРОМ НАХОДИТСЯ ОШИБКА, ОНО ПОМОЖЕТ ТЕБЕ ПОНЯТЬ КОНТЕКСТ И НАПИСАТЬ ПРАВИЛЬНОЕ ПОЯСНЕНИЕ
+
+                Верни строго JSON-объект:
+                {
+                  "explanation": "Объяснение ошибки с правилами русского языка",
+                  "hint": "Короткий совет по исправлению данной ошибки"
+                }
+
+                
+
+                Данные:
+                {{promptJson}}
+                """;
+
+            var schema = new
+            {
+                type = "object",
+                properties = new
+                {
+                    explanation = new { type = "string" },
+                    hint = new { type = "string" }
+                },
+                required = new[] { "explanation", "hint" }
+            };
+
+            var rawResponse = await CallLlmAsync(prompt, LlmMode.Strict, schema);
+
+            try
+            {
+                var result = JsonSerializer.Deserialize<ExplainGrammarItemResponse>(rawResponse, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (result == null ||
+                    string.IsNullOrWhiteSpace(result.Explanation) ||
+                    string.IsNullOrWhiteSpace(result.Hint))
+                {
+                    throw new Exception("Пустой или некорректный ответ модели.");
+                }
+
+                return result;
+            }
+            catch
+            {
+                return BuildSafeGrammarExplanation(request);
+            }
         }
 
 
@@ -502,5 +606,87 @@ namespace SmmAnalyzerPrototype.Api.Services
                 }
             };
         }
+
+        private static ExplainGrammarItemResponse BuildSafeGrammarExplanation(ExplainGrammarItemRequest request)
+        {
+            var fragment = request.Fragment?.Trim() ?? string.Empty;
+            var suggestion = request.Suggestion?.Trim() ?? string.Empty;
+            var message = request.Message?.Trim() ?? string.Empty;
+            var type = request.Type?.Trim().ToLowerInvariant() ?? string.Empty;
+
+            string NormalizeQuotes(string text) => text.Replace("\"", "«").Replace("'", "«");
+
+            if (message.Contains("через дефис", StringComparison.OrdinalIgnoreCase))
+            {
+                return new ExplainGrammarItemResponse
+                {
+                    Explanation = $"Это сочетание нужно писать через дефис.",
+                    Hint = !string.IsNullOrWhiteSpace(suggestion)
+                        ? $"Используйте вариант: «{suggestion}»."
+                        : "Проверьте написание через дефис."
+                };
+            }
+
+            if (message.Contains("слово пишется слитно", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("пишется слитно", StringComparison.OrdinalIgnoreCase))
+            {
+                return new ExplainGrammarItemResponse
+                {
+                    Explanation = $"В этом случае сочетание пишется слитно.",
+                    Hint = !string.IsNullOrWhiteSpace(suggestion)
+                        ? $"Используйте вариант: «{suggestion}»."
+                        : "Проверьте слитное написание."
+                };
+            }
+
+            if (message.Contains("пропущена запятая", StringComparison.OrdinalIgnoreCase))
+            {
+                return new ExplainGrammarItemResponse
+                {
+                    Explanation = $"В этом месте пропущена запятая.",
+                    Hint = !string.IsNullOrWhiteSpace(suggestion)
+                        ? $"Корректный вариант: «{suggestion}»."
+                        : "Проверьте пунктуацию в этом фрагменте."
+                };
+            }
+
+            if (message.Contains("должно быть", StringComparison.OrdinalIgnoreCase))
+            {
+                return new ExplainGrammarItemResponse
+                {
+                    Explanation = $"В этом выражении используется неверная форма.",
+                    Hint = !string.IsNullOrWhiteSpace(suggestion)
+                        ? $"Правильный вариант: «{suggestion}»."
+                        : message
+                };
+            }
+
+            if (message.Contains("орфографическая ошибка", StringComparison.OrdinalIgnoreCase) || type == "misspelling")
+            {
+                if (!string.IsNullOrWhiteSpace(suggestion))
+                {
+                    return new ExplainGrammarItemResponse
+                    {
+                        Explanation = $"Во фрагменте «{fragment}» есть ошибка в написании.",
+                        Hint = $"Правильный вариант: «{suggestion}»."
+                    };
+                }
+
+                return new ExplainGrammarItemResponse
+                {
+                    Explanation = $"Во фрагменте «{fragment}» есть вероятная орфографическая ошибка.",
+                    Hint = "Проверьте написание этого слова."
+                };
+            }
+
+            return new ExplainGrammarItemResponse
+            {
+                Explanation = $"Во фрагменте «{fragment}» обнаружена языковая неточность.",
+                Hint = !string.IsNullOrWhiteSpace(suggestion)
+                    ? $"Проверьте вариант: «{suggestion}»."
+                    : (!string.IsNullOrWhiteSpace(message) ? message : "Проверьте этот фрагмент вручную.")
+            };
+        }
+        
     }
 }

@@ -10,5 +10,7 @@
         public int Offset { get; set; }
         public int Length { get; set; }
         public bool IsSuspicious { get; set; }
+
+        public string Sentence { get; set; } = string.Empty;
     }
 }

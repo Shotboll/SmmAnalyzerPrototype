@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using SmmAnalyzerPrototype.Api.Services;
 using SmmAnalyzerPrototype.Data.Data;
 using SmmAnalyzerPrototype.Data.Models;
@@ -115,7 +116,8 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                         Offset = x.Position,
                         Length = 0,
                         Message = x.Message ?? string.Empty,
-                        IsSuspicious = x.IsSuspicious
+                        IsSuspicious = x.IsSuspicious,
+                        Sentence = ExtractSentenceByOffset(post.Text, x.Position)
                     })
                     .ToList();
             }
@@ -232,6 +234,16 @@ namespace SmmAnalyzerPrototype.Api.Controllers
             return NoContent();
         }
 
+        [HttpPost]
+        public async Task<ActionResult<ExplainGrammarItemResponse>> ExplainGrammarItem([FromBody] ExplainGrammarItemRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Fragment))
+                return BadRequest();
+
+            var result = await _llmService.ExplainSingleGrammarErrorAsync(request);
+            return Ok(result);
+        }
+
         [HttpPost("{postId}")]
         public async Task<ActionResult<EnhancedGrammarResponse>> RunGrammarCheck(Guid postId)
         {
@@ -247,7 +259,8 @@ namespace SmmAnalyzerPrototype.Api.Controllers
 
             var acceptedErrors = filterResult.AcceptedErrors;
 
-            var explanations = await _llmService.ExplainGrammarErrorsAsync(post.Text, acceptedErrors);
+            //var explanations = await _llmService.ExplainGrammarErrorsAsync(post.Text, acceptedErrors);
+            var explanations = new List<GrammarExplanationDto>();
             var explanationMap = explanations.ToDictionary(x => x.Index, x => x);
 
             var cards = acceptedErrors.Select((error, index) =>
@@ -263,7 +276,8 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                     Explanation = explanation?.Explanation ?? string.Empty,
                     Offset = error.Offset,
                     Length = error.Length,
-                    IsSuspicious = false
+                    IsSuspicious = false,
+                    Sentence = ExtractSentenceByOffset(post.Text, error.Offset)
                 };
             }).ToList();
 
@@ -321,6 +335,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
 
             await _context.SaveChangesAsync();
 
+
             return Ok(new EnhancedGrammarResponse
             {
                 RawErrors = acceptedErrors,
@@ -334,7 +349,8 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                     Explanation = "Сомнительное срабатывание, требует дополнительной проверки.",
                     Offset = x.Offset,
                     Length = x.Length,
-                    IsSuspicious = true
+                    IsSuspicious = true,
+                    Sentence = ExtractSentenceByOffset(post.Text, x.Offset)
                 }).ToList()
             });
         }
@@ -449,6 +465,43 @@ namespace SmmAnalyzerPrototype.Api.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(response);
+        }
+        private static string ExtractSentenceByOffset(string text, int offset)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return string.Empty;
+
+            if (offset < 0 || offset >= text.Length)
+                return text.Length <= 250 ? text : text.Substring(0, 250);
+
+            int start = offset;
+            int end = offset;
+
+            while (start > 0)
+            {
+                char c = text[start - 1];
+                if (c == '.' || c == '!' || c == '?' || c == '\n')
+                    break;
+                start--;
+            }
+
+            while (end < text.Length)
+            {
+                char c = text[end];
+                if (c == '.' || c == '!' || c == '?' || c == '\n')
+                {
+                    end++;
+                    break;
+                }
+                end++;
+            }
+
+            var sentence = text.Substring(start, end - start).Trim();
+
+            if (sentence.Length > 300)
+                sentence = sentence.Substring(0, 300).Trim();
+
+            return sentence;
         }
     }
 }

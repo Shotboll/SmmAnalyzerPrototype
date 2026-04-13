@@ -43,7 +43,8 @@ namespace RAGTEST.Controllers
                         Explanation = string.Empty,
                         Offset = x.Offset,
                         Length = x.Length,
-                        IsSuspicious = false
+                        IsSuspicious = false,
+                        Sentence = x.Sentence
                     })
                     .ToList();
 
@@ -58,12 +59,25 @@ namespace RAGTEST.Controllers
                         Explanation = string.Empty,
                         Offset = x.Offset,
                         Length = x.Length,
-                        IsSuspicious = true
+                        IsSuspicious = true,
+                        Sentence = x.Sentence
                     })
                     .ToList();
             }
 
             return View(model);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ExplainGrammarItemProxy([FromBody] ExplainGrammarItemRequest request)
+        {
+            var response = await _client.PostAsJsonAsync("api/postapi/explaingrammaritem", request);
+
+            if (!response.IsSuccessStatusCode)
+                return StatusCode((int)response.StatusCode);
+
+            var json = await response.Content.ReadAsStringAsync();
+            return Content(json, "application/json");
         }
 
         [HttpPost]
