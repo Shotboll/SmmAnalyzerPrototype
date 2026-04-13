@@ -1,0 +1,96 @@
+﻿@model List<SmmAnalyzerPrototype.Data.Models.DTO.Post.PostListItemDto>
+
+@{
+    ViewData["Title"] = "Посты";
+}
+
+<div class="page-toolbar">
+    <div class="page-header mb-0">
+        <h1 class="page-title">Посты</h1>
+        <p class="page-subtitle">Список сохранённых постов и статус выполненных проверок.</p>
+    </div>
+
+    <a asp-action="Create" class="btn btn-primary">Создать пост</a>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="app-card">
+        <div class="app-card-body">
+            <div class="empty-state">
+                Постов пока нет. Создайте первую публикацию, чтобы начать анализ.
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="app-card table-card">
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Дата</th>
+                        <th>Сообщество</th>
+                        <th>Автор</th>
+                        <th>Текст</th>
+                        <th>Статус</th>
+                        <th>Проверки</th>
+                        <th style="width: 140px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var post in Model)
+                    {
+                        <tr>
+                            <td>
+                                <div class="cell-title">@post.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</div>
+                                <div class="cell-subtitle">@post.CreatedAt.ToLocalTime().ToString("HH:mm")</div>
+                            </td>
+
+                            <td>
+                                <div class="cell-title">@post.CommunityName</div>
+                            </td>
+
+                            <td>
+                                <div class="cell-subtitle">@post.AuthorLogin</div>
+                            </td>
+
+                            <td>
+                                <div class="cell-subtitle text-truncate-soft">@post.TextPreview</div>
+                            </td>
+
+                            <td>
+                                <span class="status-chip neutral">
+                                    @(string.IsNullOrWhiteSpace(post.Status) ? "Без статуса" : post.Status)
+                                </span>
+                            </td>
+
+                            <td>
+                                <div class="d-flex flex-column gap-2">
+                                    <span class="mini-check @(post.GrammarChecked ? "done" : "pending")">
+                                        Ошибки: @(post.GrammarChecked ? "выполнено" : "нет")
+                                    </span>
+                                    <span class="mini-check @(post.StyleChecked ? "done" : "pending")">
+                                        Стиль: @(post.StyleChecked ? "выполнено" : "нет")
+                                    </span>
+                                    <span class="mini-check @(post.RegulationChecked ? "done" : "pending")">
+                                        Регламенты: @(post.RegulationChecked ? "выполнено" : "нет")
+                                    </span>
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="table-actions">
+                                    <a asp-action="Details" asp-route-id="@post.Id" class="btn btn-sm btn-outline-primary">
+                                        Открыть
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

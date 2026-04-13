@@ -10,23 +10,29 @@ namespace SmmAnalyzerPrototype.Data.Models
         public Guid Id { get; set; } = Guid.NewGuid();
 
         [Required]
-        [MaxLength(255)]
+        [Column(TypeName = "text")]
+        [MaxLength(5000)]
         public string Text { get; set; } = string.Empty;
 
         [Column("created_at")]
-        public DateTime CreatedAt { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        [MaxLength(255)]
-        public string? Status { get; set; }
+        [Column("updated_at")]
+        public DateTime? UpdatedAt { get; set; }
+
+        [MaxLength(50)]
+        public string Status { get; set; } = "Draft";
 
         public Guid AuthorId { get; set; }
 
-        [ForeignKey("AuthorId")]
+        [ForeignKey(nameof(AuthorId))]
         public virtual User Author { get; set; } = null!;
 
         public Guid CommunityId { get; set; }
 
-        [ForeignKey("CommunityId")]
+        [ForeignKey(nameof(CommunityId))]
         public virtual Community Community { get; set; } = null!;
+
+        public virtual AnalysisResult? AnalysisResult { get; set; }
     }
 }

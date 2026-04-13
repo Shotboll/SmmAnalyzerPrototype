@@ -13,6 +13,8 @@ namespace SmmAnalyzerPrototype.Data.Data
         public DbSet<Community> Communities { get; set; }
         public DbSet<Post> Posts { get; set; }
         public DbSet<AnalysisResult> AnalysisResults { get; set; }
+        public DbSet<GrammarError> GrammarErrors { get; set; }
+        public DbSet<ProhibitedTopicMatch> ProhibitedTopicMatches { get; set; }
         public DbSet<CommunityPost> CommunityPosts { get; set; }
         public DbSet<RegulationDocument> RegulationDocuments { get; set; }
         public DbSet<RegulationChunk> RegulationChunks { get; set; }
@@ -33,16 +35,52 @@ namespace SmmAnalyzerPrototype.Data.Data
                 .HasIndex(u => u.Login)
                 .IsUnique();
 
+            modelBuilder.Entity<Post>()
+                .HasOne(p => p.Author)
+                .WithMany()
+                .HasForeignKey(p => p.AuthorId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Post>()
+                .HasOne(p => p.Community)
+                .WithMany(c => c.Posts)
+                .HasForeignKey(p => p.CommunityId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             modelBuilder.Entity<AnalysisResult>()
                 .HasOne(ar => ar.Post)
-                .WithOne()
+                .WithOne(p => p.AnalysisResult)
                 .HasForeignKey<AnalysisResult>(ar => ar.PostId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<GrammarError>()
+                .HasOne(ge => ge.AnalysisResult)
+                .WithMany(ar => ar.GrammarErrors)
+                .HasForeignKey(ge => ge.AnalysisResultId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ProhibitedTopicMatch>()
+                .HasOne(pt => pt.AnalysisResult)
+                .WithMany(ar => ar.ProhibitedTopicMatches)
+                .HasForeignKey(pt => pt.AnalysisResultId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CommunityPost>()
+                .HasOne(cp => cp.Community)
+                .WithMany(c => c.CommunityPosts)
+                .HasForeignKey(cp => cp.CommunityId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             modelBuilder.Entity<RegulationDocument>()
-                .HasMany(d => d.Chunks)
-                .WithOne(c => c.Regulation)
-                .HasForeignKey(c => c.RegulationId)
+                .HasOne(rd => rd.Community)
+                .WithMany(c => c.RegulationDocuments)
+                .HasForeignKey(rd => rd.CommunityId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<RegulationDocument>()
+                .HasMany(rd => rd.Chunks)
+                .WithOne(rc => rc.Regulation)
+                .HasForeignKey(rc => rc.RegulationId)
                 .OnDelete(DeleteBehavior.Cascade);
         }
     }

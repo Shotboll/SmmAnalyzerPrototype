@@ -20,5 +20,7 @@ namespace SmmAnalyzerPrototype.Data.Models
         [MaxLength(255)]
         [EmailAddress]
         public string? Email { get; set; }
+
+        public virtual ICollection<Post> Posts { get; set; } = new List<Post>();
     }
 }

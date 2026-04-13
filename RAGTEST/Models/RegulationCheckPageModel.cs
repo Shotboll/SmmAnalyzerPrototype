@@ -15,5 +15,8 @@ namespace RAGTEST.Models
         public bool HasViolations { get; set; }
         public string Comment { get; set; } = string.Empty;
         public List<ViolationDto> Violations { get; set; } = new();
+
+        public Guid PostId { get; set; }
+        public string? CommunityName { get; set; }
     }
 }

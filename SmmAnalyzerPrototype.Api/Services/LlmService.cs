@@ -2,6 +2,7 @@
 using SmmAnalyzerPrototype.Data.Data;
 using SmmAnalyzerPrototype.Data.Models.DTO.Post;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -24,12 +25,12 @@ namespace SmmAnalyzerPrototype.Api.Services
 
         public enum LlmMode { Strict, Creative, RAG }
 
-        public async Task<string> CallLlmAsync(string prompt, LlmMode mode)
+        public async Task<string> CallLlmAsync(string prompt, LlmMode mode, object? format = null)
         {
             var options = mode switch
             {
-                LlmMode.Strict => new { temperature = 0.1, top_p = 0.1, num_predict = 500, num_ctx = 4096 },
-                LlmMode.RAG => new { temperature = 0.0, top_p = 0.2, num_predict = 1500, num_ctx = 4096 },
+                LlmMode.Strict => new { temperature = 0.0, top_p = 0.1, num_predict = 500, num_ctx = 4096 },
+                LlmMode.RAG => new { temperature = 0.0, top_p = 0.1, num_predict = 900, num_ctx = 4096 },
                 LlmMode.Creative => new { temperature = 0.8, top_p = 0.9, num_predict = 700, num_ctx = 4096 },
                 _ => new { temperature = 0.0, top_p = 0.1, num_predict = 500, num_ctx = 4096 }
             };
@@ -39,27 +40,65 @@ namespace SmmAnalyzerPrototype.Api.Services
                 model = _model,
                 prompt = prompt,
                 stream = false,
+                format = format,
                 options = options
             };
 
-            var json = JsonSerializer.Serialize(requestBody);
+            var json = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             try
             {
+                Console.WriteLine("===== OLLAMA REQUEST =====");
+                Console.WriteLine(json);
+
                 var response = await _httpClient.PostAsync("http://localhost:11434/api/generate", content);
+                var result = await response.Content.ReadAsStringAsync();
+
+                Console.WriteLine("===== OLLAMA RESPONSE STATUS =====");
+                Console.WriteLine(response.StatusCode);
+
+                Console.WriteLine("===== OLLAMA RAW RESPONSE =====");
+                Console.WriteLine(result);
+
                 response.EnsureSuccessStatusCode();
 
-                var result = await response.Content.ReadAsStringAsync();
                 using var doc = JsonDocument.Parse(result);
 
-                // Извлекаем ответ и обрезаем лишние пробелы
-                return doc.RootElement.GetProperty("response").GetString()?.Trim() ?? "";
+                if (!doc.RootElement.TryGetProperty("response", out var responseElement))
+                {
+                    Console.WriteLine("В ответе Ollama нет поля 'response'.");
+                    return string.Empty;
+                }
+
+                var text = responseElement.GetString()?.Trim() ?? string.Empty;
+
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    Console.WriteLine("Ollama вернула пустой response.");
+
+                    if (doc.RootElement.TryGetProperty("done_reason", out var doneReason))
+                        Console.WriteLine($"done_reason: {doneReason}");
+
+                    if (doc.RootElement.TryGetProperty("model", out var model))
+                        Console.WriteLine($"model: {model}");
+
+                    if (doc.RootElement.TryGetProperty("eval_count", out var evalCount))
+                        Console.WriteLine($"eval_count: {evalCount}");
+
+                    if (doc.RootElement.TryGetProperty("prompt_eval_count", out var promptEvalCount))
+                        Console.WriteLine($"prompt_eval_count: {promptEvalCount}");
+                }
+
+                return text;
             }
             catch (Exception ex)
             {
-                // Для диплома важно логировать ошибки локального сервера
-                Console.WriteLine($"Ошибка при обращении к Ollama: {ex.Message}");
+                Console.WriteLine($"Ошибка при обращении к Ollama: {ex}");
                 return string.Empty;
             }
         }
@@ -73,7 +112,8 @@ namespace SmmAnalyzerPrototype.Api.Services
 
         public async Task<string> AnalyzePostWithRagAsync(string postText, Guid communityId, int topK = 5)
         {
-            float[] queryEmbedding = await _embeddingService.GetEmbeddingAsync(postText, isQuery: true);
+            var searchText = $"Проверка поста на соответствие регламентам сообщества: {postText}";
+            float[] queryEmbedding = await _embeddingService.GetEmbeddingAsync(searchText, isQuery: true);
             float[] normalizedQuery = NormalizeVector(queryEmbedding);
 
             var chunks = await _context.RegulationChunks
@@ -85,14 +125,15 @@ namespace SmmAnalyzerPrototype.Api.Services
             ORDER BY c.embedding <=> {1}::vector
             LIMIT {2}
         ", communityId, normalizedQuery, topK)
+                .Include(x => x.Regulation)
                 .ToListAsync();
 
             var contextText = string.Join("\n\n", chunks.Select((x, i) =>
-                $"[Правило {i + 1}]\n{x.ChunkText}"
+                $"[ Номер: {i + 1}]\n{x.ChunkText}"
             ));
 
-            var prompt = $@"
-                Ты — модератор контента сообщества.
+            var prompt = $"""
+                Ты — строгий модератор контента сообщества.
 
                 Ниже приведены правила сообщества:
                 {contextText}
@@ -100,40 +141,15 @@ namespace SmmAnalyzerPrototype.Api.Services
                 Пост для проверки:
                 {postText}
 
-                Определи, нарушает ли пост правила.
+                Задача:
+                - Найти только явные нарушения правил.
+                - Указывать matchedText только как точную короткую цитату из поста.
+                
 
-                Верни ответ ТОЛЬКО в формате JSON:
+                Заполни JSON строго по заданной схеме.
+                """;
 
-                {{
-                  ""hasViolations"": true,
-                  ""violations"": [
-                    {{
-                      ""ruleNumber"": 1,
-                      ""ruleShort"": ""<краткое название правила>"",
-                      ""matchedText"": ""фрагмент поста, который нарушает правило"",
-                      ""explanation"": ""краткое объяснение причины нарушения""
-                    }}
-                  ],
-                  ""comment"": ""краткий общий вывод""
-                }}
-
-                Если нарушений нет, верни строго:
-                {{
-                  ""hasViolations"": false,
-                  ""violations"": [],
-                  ""comment"": ""Нарушений не найдено""
-                }}
-
-                Требования:
-                1. Не придумывай нарушения, если их нет.
-                2. Указывай только те правила, которые действительно относятся к посту.
-                3. Для каждого нарушения обязательно укажи matchedText — короткий фрагмент из поста.
-                4. explanation должен быть коротким, деловым и понятным.
-                5. Если одно и то же нарушение уже описано, не дублируй его.
-                6. Ответ должен быть валидным JSON без markdown, без пояснений и без лишнего текста.
-                ";
-
-            string response = await CallLlmAsync(prompt, LlmMode.RAG);
+            string response = await CallLlmAsync(prompt, LlmMode.RAG, GetRegulationCheckSchema());
 
             response = ExtractJson(response);
 
@@ -285,10 +301,12 @@ namespace SmmAnalyzerPrototype.Api.Services
             if (string.IsNullOrWhiteSpace(originalText) || rawErrors == null || rawErrors.Count == 0)
                 return new List<GrammarExplanationDto>();
 
+            var limitedErrors = rawErrors.Take(12).ToList();
+
             var promptObject = new
             {
                 text = originalText,
-                errors = rawErrors.Select((e, index) => new
+                errors = limitedErrors.Select((e, index) => new
                 {
                     index = index,
                     fragment = e.Fragment,
@@ -302,27 +320,34 @@ namespace SmmAnalyzerPrototype.Api.Services
 
             var promptJson = JsonSerializer.Serialize(promptObject, new JsonSerializerOptions
             {
-                WriteIndented = true
+                WriteIndented = true,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
             });
 
             var prompt = $$"""
                 Ты — редактор русского текста.
-                Тебе уже передан список найденных ошибок. Не ищи новые ошибки и не пропускай существующие.
+                Тебе уже передан список найденных ошибок.
 
-                Ответь строго валидным JSON-массивом такого вида:
+                Не ищи новые ошибки.
+                Не пропускай ошибки из списка.
+                Для каждой ошибки:
+                - кратко объясни проблему;
+                - дай короткий совет по исправлению.
+
+                Верни только JSON-массив:
                 [
                   {
                     "index": 0,
-                    "explanation": "Краткое объяснение ошибки",
-                    "hint": "Совет по исправлению ошибки"
+                    "explanation": "Краткое объяснение",
+                    "hint": "Короткий совет"
                   }
                 ]
 
-                Текст и ошибки:
+                Данные:
                 {{promptJson}}
                 """;
 
-            var rawResponse = await CallLlmAsync(prompt, LlmMode.Strict);
+            var rawResponse = await CallLlmAsync(prompt, LlmMode.Strict, GetGrammarExplanationSchema());
             rawResponse = ExtractJsonGrammar(rawResponse);
 
             try
@@ -332,11 +357,13 @@ namespace SmmAnalyzerPrototype.Api.Services
             }
             catch
             {
-                return rawErrors.Select((e, i) => new GrammarExplanationDto
+                return limitedErrors.Select((e, i) => new GrammarExplanationDto
                 {
                     Index = i,
                     Explanation = $"Ошибка в фрагменте \"{e.Fragment}\".",
-                    Hint = !string.IsNullOrWhiteSpace(e.Message) ? e.Message : "Проверьте предложенное исправление."
+                    Hint = !string.IsNullOrWhiteSpace(e.Message)
+                        ? e.Message
+                        : "Проверьте предложенное исправление."
                 }).ToList();
             }
         }
@@ -426,6 +453,53 @@ namespace SmmAnalyzerPrototype.Api.Services
                 Strengths = new List<string>(),
                 Issues = new List<string>(),
                 Recommendations = new List<string>()
+            };
+        }
+        private static object GetRegulationCheckSchema()
+        {
+            return new
+            {
+                type = "object",
+                properties = new
+                {
+                    hasViolations = new { type = "boolean" },
+                    violations = new
+                    {
+                        type = "array",
+                        items = new
+                        {
+                            type = "object",
+                            properties = new
+                            {
+                                ruleNumber = new { type = "integer" },
+                                ruleShort = new { type = "string" },
+                                matchedText = new { type = "string" },
+                                explanation = new { type = "string" }
+                            },
+                            required = new[] { "ruleNumber", "ruleShort", "matchedText", "explanation" }
+                        }
+                    },
+                    comment = new { type = "string" }
+                },
+                required = new[] { "hasViolations", "violations", "comment" }
+            };
+        }
+        private static object GetGrammarExplanationSchema()
+        {
+            return new
+            {
+                type = "array",
+                items = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        index = new { type = "integer" },
+                        explanation = new { type = "string" },
+                        hint = new { type = "string" }
+                    },
+                    required = new[] { "index", "explanation", "hint" }
+                }
             };
         }
     }

@@ -27,26 +27,62 @@ namespace SmmAnalyzerPrototype.Data.Migrations
             modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.AnalysisResult", b =>
                 {
                     b.Property<Guid>("PostId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("post_id");
 
                     b.Property<string>("EngagementForecast")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("engagement_forecast");
 
-                    b.Property<int?>("GrammarErrors")
-                        .HasColumnType("integer");
+                    b.Property<DateTime?>("GrammarCheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("grammar_checked_at");
 
-                    b.Property<string>("ProhibitedTopics")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
+                    b.Property<bool?>("HasRegulationViolations")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_regulation_violations");
 
-                    b.Property<string>("Recommendations")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
+                    b.Property<string>("RecommendationsJson")
+                        .HasColumnType("text")
+                        .HasColumnName("recommendations_json");
+
+                    b.Property<DateTime?>("RegulationCheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("regulation_checked_at");
+
+                    b.Property<string>("RegulationComment")
+                        .HasColumnType("text")
+                        .HasColumnName("regulation_comment");
 
                     b.Property<string>("StyleAssessment")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("style_assessment");
+
+                    b.Property<DateTime?>("StyleCheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("style_checked_at");
+
+                    b.Property<string>("StyleIssuesJson")
+                        .HasColumnType("text")
+                        .HasColumnName("style_issues_json");
+
+                    b.Property<string>("StyleRecommendationsJson")
+                        .HasColumnType("text")
+                        .HasColumnName("style_recommendations_json");
+
+                    b.Property<string>("StyleStrengthsJson")
+                        .HasColumnType("text")
+                        .HasColumnName("style_strengths_json");
+
+                    b.Property<string>("StyleSummary")
+                        .HasColumnType("text")
+                        .HasColumnName("style_summary");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
 
                     b.HasKey("PostId");
 
@@ -118,6 +154,46 @@ namespace SmmAnalyzerPrototype.Data.Migrations
                     b.ToTable("community_posts");
                 });
 
+            modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.GrammarError", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AnalysisResultId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ErrorType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("error_type");
+
+                    b.Property<string>("Fragment")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsSuspicious")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_suspicious");
+
+                    b.Property<string>("Message")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Suggestion")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AnalysisResultId");
+
+                    b.ToTable("grammar_errors");
+                });
+
             modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.Post", b =>
                 {
                     b.Property<Guid>("Id")
@@ -135,13 +211,21 @@ namespace SmmAnalyzerPrototype.Data.Migrations
                         .HasColumnName("created_at");
 
                     b.Property<string>("Status")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Text")
                         .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
+                        .HasMaxLength(5000)
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -149,7 +233,41 @@ namespace SmmAnalyzerPrototype.Data.Migrations
 
                     b.HasIndex("CommunityId");
 
+                    b.HasIndex("UserId");
+
                     b.ToTable("posts");
+                });
+
+            modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.ProhibitedTopicMatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AnalysisResultId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Evidence")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Explanation")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RegulationRef")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("regulation_ref");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AnalysisResultId");
+
+                    b.ToTable("prohibited_topic_matches");
                 });
 
             modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.RegulationChunk", b =>
@@ -245,7 +363,7 @@ namespace SmmAnalyzerPrototype.Data.Migrations
             modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.AnalysisResult", b =>
                 {
                     b.HasOne("SmmAnalyzerPrototype.Data.Models.Post", "Post")
-                        .WithOne()
+                        .WithOne("AnalysisResult")
                         .HasForeignKey("SmmAnalyzerPrototype.Data.Models.AnalysisResult", "PostId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -256,7 +374,7 @@ namespace SmmAnalyzerPrototype.Data.Migrations
             modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.CommunityPost", b =>
                 {
                     b.HasOne("SmmAnalyzerPrototype.Data.Models.Community", "Community")
-                        .WithMany()
+                        .WithMany("CommunityPosts")
                         .HasForeignKey("CommunityId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -264,23 +382,49 @@ namespace SmmAnalyzerPrototype.Data.Migrations
                     b.Navigation("Community");
                 });
 
+            modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.GrammarError", b =>
+                {
+                    b.HasOne("SmmAnalyzerPrototype.Data.Models.AnalysisResult", "AnalysisResult")
+                        .WithMany("GrammarErrors")
+                        .HasForeignKey("AnalysisResultId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AnalysisResult");
+                });
+
             modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.Post", b =>
                 {
                     b.HasOne("SmmAnalyzerPrototype.Data.Models.User", "Author")
                         .WithMany()
                         .HasForeignKey("AuthorId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("SmmAnalyzerPrototype.Data.Models.Community", "Community")
-                        .WithMany()
+                        .WithMany("Posts")
                         .HasForeignKey("CommunityId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("SmmAnalyzerPrototype.Data.Models.User", null)
+                        .WithMany("Posts")
+                        .HasForeignKey("UserId");
+
                     b.Navigation("Author");
 
                     b.Navigation("Community");
+                });
+
+            modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.ProhibitedTopicMatch", b =>
+                {
+                    b.HasOne("SmmAnalyzerPrototype.Data.Models.AnalysisResult", "AnalysisResult")
+                        .WithMany("ProhibitedTopicMatches")
+                        .HasForeignKey("AnalysisResultId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AnalysisResult");
                 });
 
             modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.RegulationChunk", b =>
@@ -297,7 +441,7 @@ namespace SmmAnalyzerPrototype.Data.Migrations
             modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.RegulationDocument", b =>
                 {
                     b.HasOne("SmmAnalyzerPrototype.Data.Models.Community", "Community")
-                        .WithMany()
+                        .WithMany("RegulationDocuments")
                         .HasForeignKey("CommunityId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -305,9 +449,35 @@ namespace SmmAnalyzerPrototype.Data.Migrations
                     b.Navigation("Community");
                 });
 
+            modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.AnalysisResult", b =>
+                {
+                    b.Navigation("GrammarErrors");
+
+                    b.Navigation("ProhibitedTopicMatches");
+                });
+
+            modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.Community", b =>
+                {
+                    b.Navigation("CommunityPosts");
+
+                    b.Navigation("Posts");
+
+                    b.Navigation("RegulationDocuments");
+                });
+
+            modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.Post", b =>
+                {
+                    b.Navigation("AnalysisResult");
+                });
+
             modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.RegulationDocument", b =>
                 {
                     b.Navigation("Chunks");
+                });
+
+            modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.User", b =>
+                {
+                    b.Navigation("Posts");
                 });
 #pragma warning restore 612, 618
         }

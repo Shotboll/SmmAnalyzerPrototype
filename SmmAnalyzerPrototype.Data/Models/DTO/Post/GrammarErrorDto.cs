@@ -8,5 +8,6 @@
         public int Offset { get; set; }
         public int Length { get; set; }
         public string Message { get; set; } = string.Empty;
+        public bool IsSuspicious { get; set; }
     }
 }

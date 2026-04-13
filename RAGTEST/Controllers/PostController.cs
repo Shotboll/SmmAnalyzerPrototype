@@ -1,10 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using RAGTEST.Models;
-using SmmAnalyzerPrototype.Data.Models.DTO;
 using SmmAnalyzerPrototype.Data.Models.DTO.Community;
 using SmmAnalyzerPrototype.Data.Models.DTO.Post;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace RAGTEST.Controllers
 {
@@ -17,171 +14,79 @@ namespace RAGTEST.Controllers
             _client = httpClientFactory.CreateClient("Api");
         }
 
+        [HttpGet]
+        public async Task<IActionResult> Index()
+        {
+            var posts = await _client.GetFromJsonAsync<List<PostListItemDto>>("api/postapi/getall")
+                        ?? new List<PostListItemDto>();
+
+            return View(posts);
+        }
+
+        [HttpGet]
         public async Task<IActionResult> Create()
         {
-            var communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall") ?? new();
+            var communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall")
+                              ?? new List<CommunityDto>();
 
             var model = new PostCreateModel
             {
                 Communities = communities
             };
-            return View(model);
-        }
-
-        // GET: /Post/RegulationCheck
-        public async Task<IActionResult> RegulationCheck()
-        {
-            var communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall") ?? new();
-
-            var model = new RegulationCheckPageModel
-            {
-                Communities = communities
-            };
 
             return View(model);
         }
 
-        // POST: /Post/RegulationCheck
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> RegulationCheck(RegulationCheckPageModel model)
-        {
-            model.Communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall") ?? new();
-
-            if (model.CommunityId == Guid.Empty)
-            {
-                ModelState.AddModelError(nameof(model.CommunityId), "Выберите сообщество.");
-            }
-
-            if (string.IsNullOrWhiteSpace(model.Text))
-            {
-                ModelState.AddModelError(nameof(model.Text), "Введите текст поста.");
-            }
-
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
-
-            var request = new AnalyzePostRequest
-            {
-                CommunityId = model.CommunityId,
-                Text = model.Text
-            };
-
-            var response = await _client.PostAsJsonAsync("api/postapi/AnalyzePost", request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                ViewBag.Error = "Ошибка при проверке по регламентам.";
-                return View(model);
-            }
-
-            var result = await response.Content.ReadFromJsonAsync<AnalyzePostResponse>();
-
-            model.HasResult = true;
-            model.HasViolations = result?.HasViolations ?? false;
-            model.Comment = result?.Comment ?? string.Empty;
-            model.Violations = result?.Violations ?? new List<ViolationDto>();
-
-            return View(model);
-        }
-
-        // POST: /Post/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(PostCreateModel model)
         {
-            model.Communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall") ?? new();
-
-            if (model.CommunityId == Guid.Empty)
-            {
-                ModelState.AddModelError(nameof(model.CommunityId), "Выберите сообщество.");
-            }
-
-            if (string.IsNullOrWhiteSpace(model.Text))
-            {
-                ModelState.AddModelError(nameof(model.Text), "Введите текст поста.");
-            }
-
-            if (!string.IsNullOrWhiteSpace(model.Text) && model.Text.Length > 5000)
-            {
-                ModelState.AddModelError(nameof(model.Text), "Текст не должен превышать 5000 символов.");
-            }
+            model.Communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall")
+                               ?? new List<CommunityDto>();
 
             if (!ModelState.IsValid)
-            {
                 return View(model);
-            }
 
-            var analyzeRequest = new AnalyzePostRequest
+            var request = new CreatePostRequest
             {
-                Text = model.Text,
+                Text = model.Text.Trim(),
                 CommunityId = model.CommunityId
             };
 
-            try
+            var response = await _client.PostAsJsonAsync("api/postapi/create", request);
+
+            if (!response.IsSuccessStatusCode)
             {
-                var grammarResponse = await _client.PostAsJsonAsync("api/postapi/CheckGrammar", analyzeRequest);
-
-                if (!grammarResponse.IsSuccessStatusCode)
-                {
-                    ViewBag.Error = "Ошибка при проверке грамматики.";
-                    return View(model);
-                }
-
-                var grammarResult = await grammarResponse.Content.ReadFromJsonAsync<EnhancedGrammarResponse>();
-
-                TempData["GrammarCards"] = JsonSerializer.Serialize(grammarResult?.Cards ?? new List<GrammarResultCardDto>());
-                TempData["SuspiciousGrammarCards"] = JsonSerializer.Serialize(grammarResult?.SuspiciousCards ?? new List<GrammarResultCardDto>());
-
-                return RedirectToAction("Analysis");
-            }
-            catch (TaskCanceledException)
-            {
-                ViewBag.Error = "Превышено время ожидания ответа от модели.";
+                ViewBag.Error = "Не удалось создать пост.";
                 return View(model);
             }
-            catch (HttpRequestException)
+
+            var createdPost = await response.Content.ReadFromJsonAsync<PostDetailsDto>();
+
+            if (createdPost == null)
             {
-                ViewBag.Error = "Не удалось подключиться к сервису анализа.";
+                ViewBag.Error = "Не удалось получить созданный пост.";
                 return View(model);
             }
-            catch (Exception)
-            {
-                ViewBag.Error = "Произошла непредвиденная ошибка при анализе текста.";
-                return View(model);
-            }
+
+            return RedirectToAction(nameof(Details), new { id = createdPost.Id });
         }
 
-        // GET: /Post/Analysis
-        public IActionResult Analysis()
-        {
-            var cardsJson = TempData["GrammarCards"]?.ToString();
-            var suspiciousJson = TempData["SuspiciousGrammarCards"]?.ToString();
-
-            var model = new GrammarAnalysisPageModel
-            {
-                Cards = !string.IsNullOrWhiteSpace(cardsJson)
-                    ? JsonSerializer.Deserialize<List<GrammarResultCardDto>>(cardsJson) ?? new List<GrammarResultCardDto>()
-                    : new List<GrammarResultCardDto>(),
-
-                SuspiciousCards = !string.IsNullOrWhiteSpace(suspiciousJson)
-                    ? JsonSerializer.Deserialize<List<GrammarResultCardDto>>(suspiciousJson) ?? new List<GrammarResultCardDto>()
-                    : new List<GrammarResultCardDto>()
-            };
-
-            return View(model);
-        }
-
-        // GET: /Post/StyleCheck
         [HttpGet]
-        public async Task<IActionResult> StyleCheck()
+        public async Task<IActionResult> Edit(Guid id)
         {
-            var communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall") ?? new();
+            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{id}");
+            if (post == null)
+                return NotFound();
 
-            var model = new StyleCheckPageModel
+            var communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall")
+                              ?? new List<CommunityDto>();
+
+            var model = new PostCreateModel
             {
+                PostId = post.Id,
+                Text = post.Text,
+                CommunityId = post.CommunityId,
                 Communities = communities
             };
 
@@ -189,60 +94,41 @@ namespace RAGTEST.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> StyleCheck(StyleCheckPageModel model)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(PostCreateModel model)
         {
-            var communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall") ?? new();
-            model.Communities = communities;
+            model.Communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall")
+                               ?? new List<CommunityDto>();
 
             if (!ModelState.IsValid)
                 return View(model);
 
-            var community = communities.FirstOrDefault(c => c.Id == model.CommunityId);
-            if (community == null)
+            var request = new UpdatePostRequest
             {
-                model.ErrorMessage = "Выбранное сообщество не найдено.";
-                return View(model);
-            }
-
-            var request = new StyleCheckRequest
-            {
-                Audience = community.TargetAudience ?? string.Empty,
-                Style = community.StyleProfile ?? string.Empty,
-                Text = model.Text
+                Text = model.Text.Trim(),
+                CommunityId = model.CommunityId
             };
 
-            var response = await _client.PostAsJsonAsync("api/postapi/CheckStyle", request);
+            var response = await _client.PutAsJsonAsync($"api/postapi/update/{model.PostId}", request);
 
             if (!response.IsSuccessStatusCode)
             {
-                model.ErrorMessage = "Ошибка при проверке стиля.";
+                ViewBag.Error = "Не удалось обновить пост.";
                 return View(model);
             }
 
-            var rawJson = await response.Content.ReadAsStringAsync();
+            return RedirectToAction(nameof(Details), new { id = model.PostId });
+        }
 
-            try
-            {
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                };
+        [HttpGet]
+        public async Task<IActionResult> Details(Guid id)
+        {
+            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{id}");
 
-                var result = JsonSerializer.Deserialize<StyleCheckResultDto>(rawJson, options);
-                if (result == null)
-                {
-                    model.ErrorMessage = "Не удалось обработать результат анализа.";
-                    return View(model);
-                }
+            if (post == null)
+                return NotFound();
 
-                model.Result = result;
-            }
-            catch
-            {
-                model.ErrorMessage = "Модель вернула некорректный ответ.";
-            }
-
-            return View(model);
+            return View(post);
         }
     }
 }

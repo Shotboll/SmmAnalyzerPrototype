@@ -22,7 +22,7 @@ namespace SmmAnalyzerPrototype.Data.Models
 
         public Guid CommunityId { get; set; }
 
-        [ForeignKey("CommunityId")]
+        [ForeignKey(nameof(CommunityId))]
         public virtual Community Community { get; set; } = null!;
 
         public virtual ICollection<RegulationChunk> Chunks { get; set; } = new List<RegulationChunk>();

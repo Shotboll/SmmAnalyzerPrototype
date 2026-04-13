@@ -19,5 +19,8 @@ namespace RAGTEST.Models
         public StyleCheckResultDto? Result { get; set; }
 
         public string? ErrorMessage { get; set; }
+
+        public Guid PostId { get; set; }
+        public string? CommunityName { get; set; }
     }
 }

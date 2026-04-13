@@ -1,0 +1,163 @@
+﻿@model RAGTEST.Models.GrammarCheckPageModel
+
+@{
+    ViewData["Title"] = "Проверка на ошибки";
+}
+
+<div class="container py-4">
+    <div class="mb-4">
+        <h1 class="fw-bold mb-2">Проверка поста на ошибки</h1>
+        <p class="text-muted mb-0">Проверка выполняется для уже сохранённого поста.</p>
+    </div>
+
+    @if (ViewBag.Error != null)
+    {
+        <div class="alert alert-danger">@ViewBag.Error</div>
+    }
+
+    <div class="card shadow-sm border-0 rounded-4 mb-4">
+        <div class="card-body p-4">
+            <div class="mb-3">
+                <div class="text-muted small">Сообщество</div>
+                <div class="fw-semibold">@Model.CommunityName</div>
+            </div>
+
+            <div class="mb-3">
+                <div class="text-muted small mb-2">Текст поста</div>
+                <div class="border rounded-4 p-3 bg-light" style="white-space: pre-wrap;">@Model.Text</div>
+            </div>
+
+            <form asp-action="Grammar" method="post" id="grammarForm">
+                @Html.AntiForgeryToken()
+                <input asp-for="PostId" type="hidden" />
+
+                <button type="submit" class="btn btn-primary" id="submitBtn">
+                    Проверить
+                </button>
+
+                <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="btn btn-outline-secondary ms-2">
+                    Назад к посту
+                </a>
+            </form>
+        </div>
+    </div>
+
+    @if (Model.HasResult)
+    {
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0 rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <h4 class="mb-3">Подтверждённые ошибки</h4>
+
+                        @if (Model.Cards.Any())
+                        {
+                            @foreach (var item in Model.Cards)
+                            {
+                                <div class="border rounded-4 p-3 mb-3">
+                                    <div><strong>Фрагмент:</strong> @item.Original</div>
+                                    @if (!string.IsNullOrWhiteSpace(item.Correction))
+                                    {
+                                        <div><strong>Исправление:</strong> @item.Correction</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(item.Type))
+                                    {
+                                        <div><strong>Тип:</strong> @item.Type</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(item.Explanation))
+                                    {
+                                        <div><strong>Пояснение:</strong> @item.Explanation</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(item.Hint))
+                                    {
+                                        <div><strong>Совет:</strong> @item.Hint</div>
+                                    }
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="text-muted">Ошибок не найдено.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0 rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <h4 class="mb-3">Сомнительные случаи</h4>
+
+                        @if (Model.SuspiciousCards.Any())
+                        {
+                            @foreach (var item in Model.SuspiciousCards)
+                            {
+                                <div class="border rounded-4 p-3 mb-3">
+                                    <div><strong>Фрагмент:</strong> @item.Original</div>
+                                    @if (!string.IsNullOrWhiteSpace(item.Correction))
+                                    {
+                                        <div><strong>Исправление:</strong> @item.Correction</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(item.Type))
+                                    {
+                                        <div><strong>Тип:</strong> @item.Type</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(item.Explanation))
+                                    {
+                                        <div><strong>Пояснение:</strong> @item.Explanation</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(item.Hint))
+                                    {
+                                        <div><strong>Совет:</strong> @item.Hint</div>
+                                    }
+                                    <div class="text-warning mt-2">Сомнительный случай</div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="text-muted">Сомнительных мест не найдено.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm border-0 rounded-4">
+            <div class="card-body p-4 text-muted text-center">
+                Результаты проверки появятся здесь после запуска анализа.
+            </div>
+        </div>
+    }
+</div>
+
+@await Html.PartialAsync("_LoadingOverlay", new RAGTEST.Models.LoadingOverlayViewModel
+{
+    OverlayId = "grammarLoadingOverlay",
+    MessageId = "grammarLoadingMessage",
+    Title = "Идёт проверка текста",
+    InitialMessage = "Выполняется анализ орфографии и пунктуации...",
+    Hint = "Это может занять некоторое время, так как используется локальная модель."
+})
+
+@section Scripts {
+    <script>
+        initLoadingForm({
+            formId: "grammarForm",
+            submitButtonId: "submitBtn",
+            overlayId: "grammarLoadingOverlay",
+            messageId: "grammarLoadingMessage",
+            submitText: "Проверить",
+            loadingButtonText: "Идёт анализ...",
+            messages: [
+                "Выполняется анализ орфографии и пунктуации...",
+                "Проверяются возможные ошибки в тексте...",
+                "Обрабатывается ответ модели...",
+                "Формируется результат анализа...",
+                "Почти готово..."
+            ]
+        });
+    </script>
+}

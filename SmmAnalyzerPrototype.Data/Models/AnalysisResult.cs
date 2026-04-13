@@ -7,23 +7,54 @@ namespace SmmAnalyzerPrototype.Data.Models
     public class AnalysisResult
     {
         [Key]
+        [Column("post_id")]
         public Guid PostId { get; set; }
 
-        public int? GrammarErrors { get; set; }
+        [ForeignKey(nameof(PostId))]
+        public virtual Post Post { get; set; } = null!;
 
-        [MaxLength(255)]
+        [Column("grammar_checked_at")]
+        public DateTime? GrammarCheckedAt { get; set; }
+
+        [Column("style_checked_at")]
+        public DateTime? StyleCheckedAt { get; set; }
+
+        [Column("regulation_checked_at")]
+        public DateTime? RegulationCheckedAt { get; set; }
+
+        [MaxLength(100)]
+        [Column("style_assessment")]
         public string? StyleAssessment { get; set; }
 
-        [MaxLength(255)]
-        public string? ProhibitedTopics { get; set; }
+        [Column("style_summary", TypeName = "text")]
+        public string? StyleSummary { get; set; }
 
-        [MaxLength(255)]
+        [Column("style_strengths_json", TypeName = "text")]
+        public string? StyleStrengthsJson { get; set; }
+
+        [Column("style_issues_json", TypeName = "text")]
+        public string? StyleIssuesJson { get; set; }
+
+        [Column("style_recommendations_json", TypeName = "text")]
+        public string? StyleRecommendationsJson { get; set; }
+
+        [Column("has_regulation_violations")]
+        public bool? HasRegulationViolations { get; set; }
+
+        [Column("regulation_comment", TypeName = "text")]
+        public string? RegulationComment { get; set; }
+
+        [MaxLength(100)]
+        [Column("engagement_forecast")]
         public string? EngagementForecast { get; set; }
 
-        [MaxLength(255)]
-        public string? Recommendations { get; set; }
+        [Column("recommendations_json", TypeName = "text")]
+        public string? RecommendationsJson { get; set; }
 
-        [ForeignKey("PostId")]
-        public virtual Post Post { get; set; } = null!;
+        [Column("updated_at")]
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+        public virtual ICollection<GrammarError> GrammarErrors { get; set; } = new List<GrammarError>();
+        public virtual ICollection<ProhibitedTopicMatch> ProhibitedTopicMatches { get; set; } = new List<ProhibitedTopicMatch>();
     }
 }

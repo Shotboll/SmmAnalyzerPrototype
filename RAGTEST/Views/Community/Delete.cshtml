@@ -1,22 +1,49 @@
-﻿@using SmmAnalyzerPrototype.Data.Models.DTO
-@using SmmAnalyzerPrototype.Data.Models.DTO.Community
+﻿@using SmmAnalyzerPrototype.Data.Models.DTO.Community
 @model CommunityDto
 
-<h2>Удаление сообщества</h2>
+@{
+    ViewData["Title"] = "Удаление сообщества";
+}
 
-<h3>Вы уверены, что хотите удалить сообщество "@Model.Name"?</h3>
+<div class="page-header">
+    <h1 class="page-title">Удаление сообщества</h1>
+    <p class="page-subtitle">Проверьте данные перед удалением. Это действие нельзя будет отменить.</p>
+</div>
 
-<dl class="row">
-    <dt class="col-sm-2">Название</dt>
-    <dd class="col-sm-10">@Model.Name</dd>
-    <dt class="col-sm-2">Целевая аудитория</dt>
-    <dd class="col-sm-10">@Model.TargetAudience</dd>
-    <dt class="col-sm-2">Стиль общения</dt>
-    <dd class="col-sm-10">@Model.StyleProfile</dd>
-</dl>
+<div class="app-card mb-4">
+    <div class="app-card-body">
+        <div class="alert alert-danger mb-4">
+            Вы действительно хотите удалить сообщество <strong>«@Model.Name»</strong>?
+        </div>
 
-<form asp-action="Delete" method="post">
-    <input type="hidden" name="id" value="@Model.Id" />
-    <button type="submit" class="btn btn-danger">Удалить</button>
-    <a asp-action="Index" class="btn btn-secondary">Отмена</a>
-</form>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="text-muted small">Название</div>
+                <div class="fw-semibold">@Model.Name</div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="text-muted small">Целевая аудитория</div>
+                <div class="fw-semibold">
+                    @(string.IsNullOrWhiteSpace(Model.TargetAudience) ? "Не указана" : Model.TargetAudience)
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="text-muted small">Стиль общения</div>
+                <div class="fw-semibold">
+                    @(string.IsNullOrWhiteSpace(Model.StyleProfile) ? "Не указан" : Model.StyleProfile)
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex flex-wrap gap-2">
+    <form asp-action="Delete" method="post" class="m-0">
+        <input type="hidden" name="id" value="@Model.Id" />
+        <button type="submit" class="btn btn-danger">Удалить сообщество</button>
+    </form>
+
+    <a asp-action="Index" class="btn btn-outline-secondary">Отмена</a>
+</div>

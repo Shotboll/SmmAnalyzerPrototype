@@ -12,7 +12,7 @@ namespace SmmAnalyzerPrototype.Data.Models
 
         public Guid RegulationId { get; set; }
 
-        [ForeignKey("RegulationId")]
+        [ForeignKey(nameof(RegulationId))]
         public virtual RegulationDocument Regulation { get; set; } = null!;
 
         [Column("embedding", TypeName = "vector(1024)")]
@@ -21,10 +21,10 @@ namespace SmmAnalyzerPrototype.Data.Models
         [Column("chunk_index")]
         public int ChunkIndex { get; set; }
 
-        [Column("chunk_text", TypeName="text")]
+        [Column("chunk_text", TypeName = "text")]
         public string ChunkText { get; set; } = string.Empty;
 
         [Column("created_at")]
-        public DateTime CreatedAt { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

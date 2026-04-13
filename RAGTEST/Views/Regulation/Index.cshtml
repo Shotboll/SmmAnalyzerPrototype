@@ -1,33 +1,76 @@
 ﻿@using SmmAnalyzerPrototype.Data.Models.DTO.Regualtion
 @model List<RegulationDocumentDto>
 
-<h2>Регламенты</h2>
+@{
+    ViewData["Title"] = "Регламенты";
+}
 
-<p>
+<div class="page-toolbar">
+    <div class="page-header mb-0">
+        <h1 class="page-title">Регламенты</h1>
+        <p class="page-subtitle">Правила и ограничения, которые используются в проверке публикаций.</p>
+    </div>
+
     <a asp-action="Create" class="btn btn-primary">Создать регламент</a>
-</p>
+</div>
 
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Название</th>
-            <th>Категория</th>
-            <th>Сообщество</th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var item in Model)
-        {
-            <tr>
-                <td>@item.Title</td>
-                <td>@item.Category</td>
-                <td>@item.CommunityId</td> @* Здесь можно вывести название сообщества, если нужно *@
-                <td>
-                    <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-warning">Редактировать</a>
-                    <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-danger">Удалить</a>
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
+@if (!Model.Any())
+{
+    <div class="app-card">
+        <div class="app-card-body">
+            <div class="empty-state">
+                Пока не создано ни одного регламента.
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="app-card table-card">
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Регламент</th>
+                        <th>Категория</th>
+                        <th>Сообщество</th>
+                        <th style="width: 180px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr>
+                            <td>
+                                <div class="cell-title">@item.Title</div>
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(item.Category))
+                                {
+                                    <span class="status-chip neutral">@item.Category</span>
+                                }
+                                else
+                                {
+                                    <span class="status-chip neutral">Без категории</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="cell-subtitle">@item.CommunityId</div>
+                            </td>
+                            <td>
+                                <div class="table-actions">
+                                    <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-warning">
+                                        Редактировать
+                                    </a>
+                                    <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-danger">
+                                        Удалить
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

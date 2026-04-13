@@ -18,5 +18,9 @@ namespace SmmAnalyzerPrototype.Data.Models
 
         [MaxLength(255)]
         public string? StyleProfile { get; set; }
+
+        public virtual ICollection<Post> Posts { get; set; } = new List<Post>();
+        public virtual ICollection<CommunityPost> CommunityPosts { get; set; } = new List<CommunityPost>();
+        public virtual ICollection<RegulationDocument> RegulationDocuments { get; set; } = new List<RegulationDocument>();
     }
 }

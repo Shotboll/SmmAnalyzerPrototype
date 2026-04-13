@@ -2,34 +2,52 @@
 @model UpdateRegulationRequest
 
 @{
+    ViewData["Title"] = "Редактировать регламент";
     var id = ViewBag.Id;
 }
 
-<h2>Редактировать регламент</h2>
+<div class="page-header">
+    <h1 class="page-title">Редактировать регламент</h1>
+    <p class="page-subtitle">Обновите параметры и текст регламента для выбранного сообщества.</p>
+</div>
 
-<form asp-action="Edit" method="post">
-    <input type="hidden" name="id" value="@id" />
-    <div class="mb-3">
-        <label asp-for="Title" class="form-label">Название</label>
-        <input asp-for="Title" class="form-control" />
-        <span asp-validation-for="Title" class="text-danger"></span>
+<div class="app-card">
+    <div class="app-card-body">
+        <form asp-action="Edit" method="post">
+            <input type="hidden" name="id" value="@id" />
+
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+            <div class="mb-3">
+                <label asp-for="Title" class="form-label">Название</label>
+                <input asp-for="Title" class="form-control" placeholder="Введите название регламента" />
+                <span asp-validation-for="Title" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Category" class="form-label">Категория</label>
+                <input asp-for="Category" class="form-control" placeholder="Введите категорию" />
+                <span asp-validation-for="Category" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="CommunityId" class="form-label">Сообщество</label>
+                <select asp-for="CommunityId" asp-items="@(ViewBag.Communities)" class="form-select">
+                    <option value="">-- Выберите сообщество --</option>
+                </select>
+                <span asp-validation-for="CommunityId" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-4">
+                <label asp-for="Content" class="form-label">Текст регламента</label>
+                <textarea asp-for="Content" class="form-control" rows="10" placeholder="Введите текст регламента"></textarea>
+                <span asp-validation-for="Content" class="text-danger small"></span>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Отмена</a>
+            </div>
+        </form>
     </div>
-    <div class="mb-3">
-        <label asp-for="Content" class="form-label">Текст регламента</label>
-        <textarea asp-for="Content" class="form-control" rows="10"></textarea>
-        <span asp-validation-for="Content" class="text-danger"></span>
-    </div>
-    <div class="mb-3">
-        <label asp-for="Category" class="form-label">Категория</label>
-        <input asp-for="Category" class="form-control" />
-    </div>
-    <div class="mb-3">
-        <label asp-for="CommunityId" class="form-label">Сообщество</label>
-        <select asp-for="CommunityId" asp-items="@(ViewBag.Communities)" class="form-select">
-            <option value="">-- Выберите сообщество --</option>
-        </select>
-        <span asp-validation-for="CommunityId" class="text-danger"></span>
-    </div>
-    <button type="submit" class="btn btn-primary">Сохранить</button>
-    <a asp-action="Index" class="btn btn-secondary">Отмена</a>
-</form>
+</div>

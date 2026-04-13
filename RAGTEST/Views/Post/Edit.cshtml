@@ -1,12 +1,14 @@
 ﻿@model PostCreateModel
 
 @{
-    ViewData["Title"] = "Создание поста";
+    ViewData["Title"] = "Редактирование поста";
 }
 
 <div class="page-header">
-    <h1 class="page-title">Создание поста</h1>
-    <p class="page-subtitle">Сохраните публикацию, чтобы затем выполнять проверки и хранить результаты анализа.</p>
+    <h1 class="page-title">Редактирование поста</h1>
+    <p class="page-subtitle">
+        Измените текст публикации или сообщество. После сохранения предыдущие результаты проверок будут сброшены.
+    </p>
 </div>
 
 @if (ViewBag.Error != null)
@@ -18,8 +20,10 @@
     <div class="col-lg-8">
         <div class="app-card">
             <div class="app-card-body">
-                <form asp-action="Create" method="post">
+                <form asp-action="Edit" method="post">
                     @Html.AntiForgeryToken()
+
+                    <input asp-for="PostId" type="hidden" />
 
                     <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
@@ -45,8 +49,8 @@
                     </div>
 
                     <div class="d-flex flex-wrap gap-2">
-                        <button type="submit" class="btn btn-primary">Сохранить пост</button>
-                        <a asp-action="Index" class="btn btn-outline-secondary">К списку постов</a>
+                        <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                        <a asp-action="Details" asp-route-id="@Model.PostId" class="btn btn-outline-secondary">Назад к посту</a>
                     </div>
                 </form>
             </div>
@@ -56,22 +60,27 @@
     <div class="col-lg-4">
         <div class="app-card h-100">
             <div class="app-card-body">
-                <h3 class="section-card-title mb-3">Что будет дальше</h3>
+                <h3 class="section-card-title mb-3">Что произойдёт после сохранения</h3>
 
                 <div class="d-flex flex-column gap-3">
                     <div class="info-note">
-                        <div class="info-note-title">1. Пост сохранится в системе</div>
-                        <div class="info-note-text">После создания публикация появится в списке постов и получит собственную карточку.</div>
+                        <div class="info-note-title">Пост будет обновлён</div>
+                        <div class="info-note-text">Система сохранит новый текст и выбранное сообщество.</div>
                     </div>
 
                     <div class="info-note">
-                        <div class="info-note-title">2. Можно запускать проверки</div>
-                        <div class="info-note-text">Для поста будут доступны анализ ошибок, проверка стиля и проверка регламентов.</div>
+                        <div class="info-note-title">Результаты проверок сбросятся</div>
+                        <div class="info-note-text">
+                            Анализы ошибок, стиля и регламентов относятся только к прежней версии текста,
+                            поэтому после изменения они удаляются.
+                        </div>
                     </div>
 
                     <div class="info-note">
-                        <div class="info-note-title">3. Результаты сохранятся</div>
-                        <div class="info-note-text">Все выполненные анализы будут доступны при повторном открытии карточки поста.</div>
+                        <div class="info-note-title">Понадобится повторная проверка</div>
+                        <div class="info-note-text">
+                            После сохранения можно снова открыть карточку поста и запустить нужные анализы.
+                        </div>
                     </div>
                 </div>
             </div>

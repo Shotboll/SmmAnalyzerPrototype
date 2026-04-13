@@ -1,8 +1,151 @@
 ﻿@{
-    ViewData["Title"] = "Home Page";
+    ViewData["Title"] = "Главная";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="home-hero app-card mb-4">
+    <div class="app-card-body p-4 p-lg-5">
+        <div class="row align-items-center g-4">
+            <div class="col-lg-7">
+                <div class="hero-badge mb-3">Система анализа постов</div>
+                <h1 class="home-title mb-3">
+                    Подготовка и проверка публикаций для сообществ
+                </h1>
+                <p class="home-subtitle mb-4">
+                    Создавайте посты, запускайте проверку орфографии, анализируйте стиль текста
+                    и оценивайте соответствие регламентам сообщества в одном интерфейсе.
+                </p>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <a asp-controller="Post" asp-action="Create" class="btn btn-primary">
+                        Создать пост
+                    </a>
+                    <a asp-controller="Post" asp-action="Index" class="btn btn-outline-secondary">
+                        Перейти к постам
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="hero-side-card">
+                    <div class="hero-side-title mb-3">Основные возможности</div>
+
+                    <div class="hero-feature-list">
+                        <div class="hero-feature-item">
+                            <div class="hero-feature-icon">✓</div>
+                            <div>
+                                <div class="hero-feature-title">Проверка на ошибки</div>
+                                <div class="hero-feature-text">Орфография, пунктуация и сомнительные срабатывания.</div>
+                            </div>
+                        </div>
+
+                        <div class="hero-feature-item">
+                            <div class="hero-feature-icon">✓</div>
+                            <div>
+                                <div class="hero-feature-title">Проверка стиля</div>
+                                <div class="hero-feature-text">Соответствие аудитории и стилю общения сообщества.</div>
+                            </div>
+                        </div>
+
+                        <div class="hero-feature-item">
+                            <div class="hero-feature-icon">✓</div>
+                            <div>
+                                <div class="hero-feature-title">Проверка регламентов</div>
+                                <div class="hero-feature-text">Выявление потенциальных нарушений правил публикации.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-4">
+        <div class="app-card h-100">
+            <div class="app-card-body">
+                <div class="section-icon section-icon-blue mb-3">🏢</div>
+                <h3 class="section-card-title">Сообщества</h3>
+                <p class="section-card-text">
+                    Настройка сообществ, целевой аудитории и стилевого профиля для дальнейшего анализа постов.
+                </p>
+                <a asp-controller="Community" asp-action="Index" class="btn btn-outline-primary">
+                    Открыть раздел
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="app-card h-100">
+            <div class="app-card-body">
+                <div class="section-icon section-icon-violet mb-3">📘</div>
+                <h3 class="section-card-title">Регламенты</h3>
+                <p class="section-card-text">
+                    Хранение правил и ограничений, которые используются при автоматической проверке публикаций.
+                </p>
+                <a asp-controller="Regulation" asp-action="Index" class="btn btn-outline-primary">
+                    Открыть раздел
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="app-card h-100">
+            <div class="app-card-body">
+                <div class="section-icon section-icon-green mb-3">✍️</div>
+                <h3 class="section-card-title">Посты</h3>
+                <p class="section-card-text">
+                    Создание постов, запуск проверок и просмотр сохранённых результатов анализа в карточке публикации.
+                </p>
+                <a asp-controller="Post" asp-action="Index" class="btn btn-outline-primary">
+                    Открыть раздел
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="app-card">
+    <div class="app-card-body">
+        <div class="page-header mb-3">
+            <h2 class="page-title" style="font-size: 1.35rem;">Как работать с системой</h2>
+            <p class="page-subtitle">Базовый сценарий использования приложения.</p>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-6 col-xl-3">
+                <div class="step-card h-100">
+                    <div class="step-number">1</div>
+                    <div class="step-title">Создайте сообщество</div>
+                    <div class="step-text">Задайте название, аудиторию и стиль общения.</div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-xl-3">
+                <div class="step-card h-100">
+                    <div class="step-number">2</div>
+                    <div class="step-title">Добавьте регламенты</div>
+                    <div class="step-text">Создайте правила, которые будут использоваться в проверке.</div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-xl-3">
+                <div class="step-card h-100">
+                    <div class="step-number">3</div>
+                    <div class="step-title">Создайте пост</div>
+                    <div class="step-text">Сохраните текст публикации и откройте карточку поста.</div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-xl-3">
+                <div class="step-card h-100">
+                    <div class="step-number">4</div>
+                    <div class="step-title">Запустите проверки</div>
+                    <div class="step-text">Выполните анализы и просмотрите сохранённые результаты.</div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>

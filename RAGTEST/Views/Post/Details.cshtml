@@ -1,0 +1,291 @@
+﻿@model SmmAnalyzerPrototype.Data.Models.DTO.Post.PostDetailsDto
+
+@{
+    ViewData["Title"] = "Карточка поста";
+}
+
+<div class="page-header">
+    <h1 class="page-title">Карточка поста</h1>
+    <p class="page-subtitle">Текст публикации, доступные проверки и сохранённые результаты анализа.</p>
+</div>
+
+<div class="app-card mb-4">
+    <div class="app-card-body">
+        <div class="details-meta-grid mb-4">
+            <div class="meta-box">
+                <div class="meta-box-label">Сообщество</div>
+                <div class="meta-box-value">@Model.CommunityName</div>
+            </div>
+
+            <div class="meta-box">
+                <div class="meta-box-label">Автор</div>
+                <div class="meta-box-value">@Model.AuthorLogin</div>
+            </div>
+
+            <div class="meta-box">
+                <div class="meta-box-label">Дата создания</div>
+                <div class="meta-box-value">@Model.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+            </div>
+        </div>
+
+        <div class="text-muted small mb-2">Текст поста</div>
+        <div class="post-content-box">@Model.Text</div>
+    </div>
+</div>
+
+<div class="app-card mb-4">
+    <div class="app-card-body">
+        <div class="section-header-line">
+            <div>
+                <h3 class="section-card-title mb-1">Действия</h3>
+                <p class="section-card-text mb-0">Запустите нужную проверку или вернитесь к общему списку.</p>
+            </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            <a asp-controller="PostCheck" asp-action="Grammar" asp-route-postId="@Model.Id" class="btn btn-primary">
+                Проверка на ошибки
+            </a>
+            <a asp-controller="PostCheck" asp-action="Style" asp-route-postId="@Model.Id" class="btn btn-primary">
+                Проверка стиля
+            </a>
+            <a asp-controller="PostCheck" asp-action="Regulations" asp-route-postId="@Model.Id" class="btn btn-primary">
+                Проверка регламентов
+            </a>
+            <a asp-controller="Post" asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-outline-primary">
+                Редактировать пост
+            </a>
+            <a asp-controller="Post" asp-action="Index" class="btn btn-outline-secondary">
+                К списку постов
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex flex-column gap-4">
+
+    <div class="app-card">
+        <div class="app-card-body">
+            <div class="details-section-head mb-3">
+                <div>
+                    <h3 class="section-card-title mb-1">Проверка на ошибки</h3>
+                    @if (Model.GrammarCheckedAt != null)
+                    {
+                        <div class="section-state success">Проверка выполнена</div>
+                        <div class="section-time">@Model.GrammarCheckedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                    }
+                    else
+                    {
+                        <div class="section-state neutral">Проверка ещё не выполнялась</div>
+                    }
+                </div>
+            </div>
+
+            @if (Model.GrammarCheckedAt != null)
+            {
+                @if (Model.GrammarErrors.Any())
+                {
+                    <div class="row g-3">
+                        @foreach (var error in Model.GrammarErrors)
+                        {
+                            <div class="col-12 col-xl-6">
+                                <div class="inner-card h-100">
+                                    <div><strong>Фрагмент:</strong> @error.Fragment</div>
+
+                                    @if (!string.IsNullOrWhiteSpace(error.Suggestion))
+                                    {
+                                        <div><strong>Исправление:</strong> @error.Suggestion</div>
+                                    }
+
+                                    @if (!string.IsNullOrWhiteSpace(error.Type))
+                                    {
+                                        <div><strong>Тип:</strong> @error.Type</div>
+                                    }
+
+                                    @if (!string.IsNullOrWhiteSpace(error.Message))
+                                    {
+                                        <div><strong>Комментарий:</strong> @error.Message</div>
+                                    }
+
+                                    @if (error.IsSuspicious)
+                                    {
+                                        <div class="section-state warning mt-2">Сомнительный случай</div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="empty-state">Ошибок не найдено.</div>
+                }
+            }
+        </div>
+    </div>
+
+    <div class="app-card">
+        <div class="app-card-body">
+            <div class="details-section-head mb-3">
+                <div>
+                    <h3 class="section-card-title mb-1">Проверка стиля</h3>
+                    @if (Model.StyleCheckedAt != null)
+                    {
+                        <div class="section-state success">Проверка выполнена</div>
+                        <div class="section-time">@Model.StyleCheckedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                    }
+                    else
+                    {
+                        <div class="section-state neutral">Проверка ещё не выполнялась</div>
+                    }
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(Model.StyleAssessment))
+                {
+                    var badgeClass = Model.StyleAssessment.ToLower() switch
+                    {
+                        "соответствует" => "status-chip success",
+                        "частично соответствует" => "status-chip warning",
+                        "не соответствует" => "status-chip danger",
+                        _ => "status-chip neutral"
+                    };
+
+                    <span class="@badgeClass">@Model.StyleAssessment</span>
+                }
+            </div>
+
+            @if (Model.StyleCheckedAt != null)
+            {
+                @if (!string.IsNullOrWhiteSpace(Model.StyleSummary))
+                {
+                    <div class="summary-panel mb-4">
+                        <div class="fw-semibold mb-2">Общий вывод</div>
+                        <div>@Model.StyleSummary</div>
+                    </div>
+                }
+
+                <div class="row g-3">
+                    <div class="col-lg-6">
+                        <div class="inner-card h-100">
+                            <h5 class="mb-3">Сильные стороны</h5>
+                            @if (Model.StyleStrengths.Any())
+                            {
+                                <ul class="mb-0 ps-3">
+                                    @foreach (var item in Model.StyleStrengths)
+                                    {
+                                        <li class="mb-2">@item</li>
+                                    }
+                                </ul>
+                            }
+                            else
+                            {
+                                <p class="text-muted mb-0">Сильные стороны не выделены.</p>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <div class="inner-card h-100">
+                            <h5 class="mb-3">Что можно улучшить</h5>
+                            @if (Model.StyleIssues.Any())
+                            {
+                                <ul class="mb-0 ps-3">
+                                    @foreach (var item in Model.StyleIssues)
+                                    {
+                                        <li class="mb-2">@item</li>
+                                    }
+                                </ul>
+                            }
+                            else
+                            {
+                                <p class="text-muted mb-0">Явных проблем не найдено.</p>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="inner-card">
+                            <h5 class="mb-3">Рекомендации</h5>
+                            @if (Model.StyleRecommendations.Any())
+                            {
+                                <ol class="mb-0 ps-3">
+                                    @foreach (var item in Model.StyleRecommendations)
+                                    {
+                                        <li class="mb-2">@item</li>
+                                    }
+                                </ol>
+                            }
+                            else
+                            {
+                                <p class="text-muted mb-0">Рекомендации не были сформированы.</p>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="app-card">
+        <div class="app-card-body">
+            <div class="details-section-head mb-3">
+                <div>
+                    <h3 class="section-card-title mb-1">Проверка регламентов</h3>
+                    @if (Model.RegulationCheckedAt != null)
+                    {
+                        <div class="section-state success">Проверка выполнена</div>
+                        <div class="section-time">@Model.RegulationCheckedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                    }
+                    else
+                    {
+                        <div class="section-state neutral">Проверка ещё не выполнялась</div>
+                    }
+                </div>
+            </div>
+
+            @if (Model.RegulationCheckedAt != null)
+            {
+                <div class="mb-3">
+                    <strong>Статус:</strong>
+                    @(Model.HasRegulationViolations == true ? "Есть нарушения" : "Нарушений не найдено")
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(Model.RegulationComment))
+                {
+                    <div class="summary-panel mb-4">
+                        @Model.RegulationComment
+                    </div>
+                }
+
+                @if (Model.RegulationViolations.Any())
+                {
+                    <div class="row g-3">
+                        @foreach (var match in Model.RegulationViolations)
+                        {
+                            <div class="col-12 col-xl-6">
+                                <div class="inner-card h-100">
+                                    <div><strong>Тема:</strong> @match.RuleShort</div>
+
+                                    @if (!string.IsNullOrWhiteSpace(match.MatchedText))
+                                    {
+                                        <div><strong>Фрагмент:</strong> @match.MatchedText</div>
+                                    }
+
+                                    @if (!string.IsNullOrWhiteSpace(match.Explanation))
+                                    {
+                                        <div><strong>Пояснение:</strong> @match.Explanation</div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="empty-state">Совпадений с нарушениями не найдено.</div>
+                }
+            }
+        </div>
+    </div>
+
+</div>

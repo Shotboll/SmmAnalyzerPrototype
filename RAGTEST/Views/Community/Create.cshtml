@@ -1,26 +1,45 @@
-﻿@using SmmAnalyzerPrototype.Data.Models.DTO
-@using SmmAnalyzerPrototype.Data.Models.DTO.Community
+﻿@using SmmAnalyzerPrototype.Data.Models.DTO.Community
 @model CreateCommunityRequest
 
-<h2>Создать сообщество</h2>
+@{
+    ViewData["Title"] = "Создать сообщество";
+}
 
-<form asp-action="Create" method="post">
-    <div class="mb-3">
-        <label asp-for="Name" class="form-label">Название</label>
-        <input asp-for="Name" class="form-control" />
-        <span asp-validation-for="Name" class="text-danger"></span>
+<div class="page-header">
+    <h1 class="page-title">Создать сообщество</h1>
+    <p class="page-subtitle">Заполните основные параметры сообщества для дальнейшей работы с постами и проверками.</p>
+</div>
+
+<div class="app-card">
+    <div class="app-card-body">
+        <form asp-action="Create" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+            <div class="mb-3">
+                <label asp-for="Name" class="form-label">Название</label>
+                <input asp-for="Name" class="form-control" placeholder="Например, IT-сообщество компании" />
+                <span asp-validation-for="Name" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="TargetAudience" class="form-label">Целевая аудитория</label>
+                <input asp-for="TargetAudience" class="form-control" placeholder="Например, junior и middle разработчики" />
+                <span asp-validation-for="TargetAudience" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-4">
+                <label asp-for="StyleProfile" class="form-label">Стиль общения</label>
+                <input asp-for="StyleProfile" class="form-control" placeholder="Например, деловой, дружелюбный, экспертный" />
+                <span asp-validation-for="StyleProfile" class="text-danger small"></span>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary">Создать сообщество</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Отмена</a>
+            </div>
+        </form>
     </div>
-    <div class="mb-3">
-        <label asp-for="TargetAudience" class="form-label">Целевая аудитория</label>
-        <input asp-for="TargetAudience" class="form-control" />
-    </div>
-    <div class="mb-3">
-        <label asp-for="StyleProfile" class="form-label">Стиль общения</label>
-        <input asp-for="StyleProfile" class="form-control" />
-    </div>
-    <button type="submit" class="btn btn-primary">Создать</button>
-    <a asp-action="Index" class="btn btn-secondary">Отмена</a>
-</form>
+</div>
 
 @section Scripts {
     @{

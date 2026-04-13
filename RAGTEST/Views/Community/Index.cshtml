@@ -1,34 +1,83 @@
-﻿@using SmmAnalyzerPrototype.Data.Models.DTO
-@using SmmAnalyzerPrototype.Data.Models.DTO.Community
+﻿@using SmmAnalyzerPrototype.Data.Models.DTO.Community
 @model List<CommunityDto>
 
-<h2>Сообщества</h2>
+@{
+    ViewData["Title"] = "Сообщества";
+}
 
-<p>
+<div class="page-toolbar">
+    <div class="page-header mb-0">
+        <h1 class="page-title">Сообщества</h1>
+        <p class="page-subtitle">Управление сообществами, их аудиторией и стилем коммуникации.</p>
+    </div>
+
     <a asp-action="Create" class="btn btn-primary">Создать сообщество</a>
-</p>
+</div>
 
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Название</th>
-            <th>Целевая аудитория</th>
-            <th>Стиль общения</th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var item in Model)
-        {
-            <tr>
-                <td>@item.Name</td>
-                <td>@item.TargetAudience</td>
-                <td>@item.StyleProfile</td>
-                <td>
-                    <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-warning">Редактировать</a>
-                    <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-danger">Удалить</a>
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
+@if (!Model.Any())
+{
+    <div class="app-card">
+        <div class="app-card-body">
+            <div class="empty-state">
+                Пока не создано ни одного сообщества.
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="app-card table-card">
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Сообщество</th>
+                        <th>Целевая аудитория</th>
+                        <th>Стиль общения</th>
+                        <th style="width: 180px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr>
+                            <td>
+                                <div class="cell-title">@item.Name</div>
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(item.TargetAudience))
+                                {
+                                    <div class="cell-subtitle">@item.TargetAudience</div>
+                                }
+                                else
+                                {
+                                    <span class="status-chip neutral">Не указана</span>
+                                }
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(item.StyleProfile))
+                                {
+                                    <div class="cell-subtitle">@item.StyleProfile</div>
+                                }
+                                else
+                                {
+                                    <span class="status-chip neutral">Не указан</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="table-actions">
+                                    <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-warning">
+                                        Редактировать
+                                    </a>
+                                    <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-danger">
+                                        Удалить
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

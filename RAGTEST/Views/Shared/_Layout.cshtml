@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,67 +9,56 @@
     <link rel="stylesheet" href="~/RAGTEST.styles.css" asp-append-version="true" />
 </head>
 <body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">RAGTEST</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
+    <header class="app-header">
+        <nav class="navbar navbar-expand-lg app-navbar">
+            <div class="container">
+                <a class="navbar-brand app-brand" asp-area="" asp-controller="Home" asp-action="Index">
+                    <span class="brand-mark">SA</span>
+                    <span>SmmAnalyzer</span>
+                </a>
+
+                <button class="navbar-toggler app-navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar"
+                        aria-controls="mainNavbar" aria-expanded="false" aria-label="Переключить навигацию">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
-                        </li>
 
-                        @* <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="RagTest" asp-action="Index">RAG</a>
+                <div class="collapse navbar-collapse" id="mainNavbar">
+                    <ul class="navbar-nav ms-auto app-nav-list">
+                        <li class="nav-item">
+                            <a class="nav-link app-nav-link" asp-area="" asp-controller="Home" asp-action="Index">Главная</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="RagTest" asp-action="SaigaRag">RAG-пост</a>
+                            <a class="nav-link app-nav-link" asp-area="" asp-controller="Community" asp-action="Index">Сообщества</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="RagTest" asp-action="TextErrors">Проверка на ошибки</a>
+                            <a class="nav-link app-nav-link" asp-area="" asp-controller="Regulation" asp-action="Index">Регламенты</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="RagTest" asp-action="StyleCheck">Стилевая проверка</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="RagTest" asp-action="Posts">Посты</a>
-                        </li> *@
-
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Community" asp-action="Index">Сообщества</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Regulation" asp-action="Index">Регламенты</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Post" asp-action="Create">Проверка на ошибки</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Post" asp-action="StyleCheck">Проверка стиля</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Post" asp-action="RegulationCheck">Проверка регламентов</a>
+                            <a class="nav-link app-nav-link" asp-controller="Post" asp-action="Index">Посты</a>
                         </li>
                     </ul>
                 </div>
             </div>
         </nav>
     </header>
-    <div class="container">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
+
+    <div class="app-shell">
+        <div class="container">
+            <main role="main" class="app-main">
+                @RenderBody()
+            </main>
+        </div>
     </div>
 
-    <footer class="border-top footer text-muted">
+    <footer class="app-footer">
         <div class="container">
-            &copy; 2026 - RAGTEST
+            <div class="app-footer-inner">
+                <span>&copy; 2026 - RAGTEST</span>
+                <span class="footer-muted">Система анализа постов для сообществ</span>
+            </div>
         </div>
     </footer>
+
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
