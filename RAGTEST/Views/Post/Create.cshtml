@@ -1,40 +1,149 @@
 ﻿@model PostCreateModel
 
-<h2>Новый пост</h2>
+@{
+    ViewData["Title"] = "Новый пост";
+}
+
+<h2 class="mb-4">Новый пост</h2>
 
 @if (ViewBag.Error != null)
 {
     <div class="alert alert-danger">@ViewBag.Error</div>
 }
 
-<form asp-action="Create" method="post">
+<form asp-action="Create" method="post" id="analyzeForm">
+    @Html.AntiForgeryToken()
+
     <div class="mb-3">
         <label asp-for="CommunityId" class="form-label"></label>
-        <select asp-for="CommunityId" asp-items="@(new SelectList(Model.Communities, "Id", "Name"))" class="form-select">
+        <select asp-for="CommunityId"
+                asp-items="@(new SelectList(Model.Communities, "Id", "Name"))"
+                class="form-select"
+                id="communitySelect">
             <option value="">-- Выберите сообщество --</option>
         </select>
         <span asp-validation-for="CommunityId" class="text-danger"></span>
     </div>
+
     <div class="mb-3">
         <label asp-for="Text" class="form-label"></label>
-        <textarea asp-for="Text" class="form-control" rows="20"></textarea>
+        <textarea asp-for="Text"
+                  class="form-control"
+                  rows="20"
+                  id="postText"
+                  maxlength="5000"
+                  placeholder="Введите текст поста для анализа"></textarea>
+        <div class="form-text">
+            <span id="charCounter">0</span> / 5000 символов
+        </div>
         <span asp-validation-for="Text" class="text-danger"></span>
     </div>
-    <button type="submit" class="btn btn-primary">Анализировать</button>
+
+    <button type="submit" class="btn btn-primary" id="submitButton">
+        Анализировать
+    </button>
 </form>
 
+<div id="loadingOverlay" class="loading-overlay d-none">
+    <div class="loading-modal">
+        <div class="spinner-border text-primary loading-spinner" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+
+        <h4 class="mt-3 mb-2">Идёт проверка текста</h4>
+        <p class="text-muted mb-2" id="loadingMessage">
+            Выполняется анализ орфографии и пунктуации...
+        </p>
+        <small class="text-secondary">
+            Это может занять некоторое время.
+        </small>
+    </div>
+</div>
+
 @section Scripts {
-    @{
-        await Html.RenderPartialAsync("_ValidationScriptsPartial");
-    }
     <partial name="_ValidationScriptsPartial" />
+
     <script>
-        document.querySelector("form")?.addEventListener("submit", function () {
-            const btn = document.getElementById("submitBtn");
-            if (btn) {
-                btn.disabled = true;
-                btn.innerText = "Проверка...";
+        (function () {
+            const form = document.getElementById('analyzeForm');
+            const submitButton = document.getElementById('submitButton');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingMessage = document.getElementById('loadingMessage');
+            const postText = document.getElementById('postText');
+            const communitySelect = document.getElementById('communitySelect');
+            const charCounter = document.getElementById('charCounter');
+
+            const loadingMessages = [
+                'Выполняется анализ орфографии и пунктуации...',
+                'Проверяются возможные ошибки в тексте...',
+                'Формируется результат анализа...',
+                'Почти готово...'
+            ];
+
+            let loadingInterval = null;
+
+            function updateCharCounter() {
+                const currentLength = postText.value.length;
+                charCounter.textContent = currentLength.toString();
             }
-        });
+
+            function startLoadingMessages() {
+                let index = 0;
+                loadingMessage.textContent = loadingMessages[index];
+
+                loadingInterval = setInterval(() => {
+                    index++;
+                    if (index < loadingMessages.length) {
+                        loadingMessage.textContent = loadingMessages[index];
+                    }
+                }, 7000);
+            }
+
+            function stopLoadingMessages() {
+                if (loadingInterval) {
+                    clearInterval(loadingInterval);
+                    loadingInterval = null;
+                }
+            }
+
+            function showLoading() {
+                loadingOverlay.classList.remove('d-none');
+                document.body.classList.add('loading-active');
+
+                submitButton.disabled = true;
+                submitButton.textContent = 'Идёт анализ...';
+
+                startLoadingMessages();
+            }
+
+            function hideLoading() {
+                loadingOverlay.classList.add('d-none');
+                document.body.classList.remove('loading-active');
+
+                submitButton.disabled = false;
+                submitButton.textContent = 'Анализировать';
+
+                stopLoadingMessages();
+            }
+
+            updateCharCounter();
+            postText.addEventListener('input', updateCharCounter);
+
+            form.addEventListener('submit', function (e) {
+                const text = postText.value.trim();
+                const communityId = communitySelect.value;
+
+                if (!communityId || !text) {
+                    hideLoading();
+                    return;
+                }
+
+                showLoading();
+            });
+
+            window.addEventListener('pageshow', function () {
+                hideLoading();
+            });
+        })();
     </script>
 }

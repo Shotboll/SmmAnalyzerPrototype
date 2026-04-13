@@ -25,12 +25,13 @@
                 <div class="card-body p-4">
                     <h4 class="card-title mb-4">Параметры анализа</h4>
 
-                    <form asp-action="StyleCheck" method="post" novalidate>
+                    <form asp-action="StyleCheck" method="post" novalidate id="styleCheckForm">
+                        @Html.AntiForgeryToken()
                         <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
                         <div class="mb-3">
                             <label asp-for="CommunityId" class="form-label fw-semibold">Сообщество</label>
-                            <select asp-for="CommunityId" class="form-select rounded-3">
+                            <select asp-for="CommunityId" class="form-select rounded-3" id="communitySelect">
                                 <option value="">Выберите сообщество</option>
                                 @foreach (var community in Model.Communities)
                                 {
@@ -44,14 +45,20 @@
 
                         <div class="mb-3">
                             <label asp-for="Text" class="form-label fw-semibold">Текст поста</label>
-                            <textarea asp-for="Text" class="form-control rounded-3" rows="12"
+                            <textarea asp-for="Text"
+                                      class="form-control rounded-3"
+                                      rows="12"
+                                      id="postText"
+                                      maxlength="5000"
                                       placeholder="Введите текст поста для анализа"></textarea>
                             <span asp-validation-for="Text" class="text-danger small"></span>
-                            <div class="form-text">Максимум 5000 символов.</div>
+                            <div class="form-text">
+                                <span id="charCounter">0</span> / 5000 символов
+                            </div>
                         </div>
 
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg rounded-3">
+                            <button type="submit" class="btn btn-primary btn-lg rounded-3" id="submitBtn">
                                 Проверить стиль
                             </button>
                         </div>
@@ -165,15 +172,103 @@
     </div>
 </div>
 
+<div id="loadingOverlay" class="loading-overlay d-none">
+    <div class="loading-modal">
+        <div class="spinner-border text-primary loading-spinner" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+
+        <h4 class="mt-3 mb-2">Идёт проверка стиля</h4>
+        <p class="text-muted mb-2" id="loadingMessage">
+            Анализируем соответствие текста аудитории и стилю сообщества...
+        </p>
+        <small class="text-secondary">
+            Проверка может занять некоторое время.
+        </small>
+    </div>
+</div>
+
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+
     <script>
-        document.querySelector("form")?.addEventListener("submit", function () {
-            const btn = document.getElementById("submitBtn");
-            if (btn) {
-                btn.disabled = true;
-                btn.innerText = "Проверка...";
+        (function () {
+            const form = document.getElementById('styleCheckForm');
+            const submitBtn = document.getElementById('submitBtn');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingMessage = document.getElementById('loadingMessage');
+            const postText = document.getElementById('postText');
+            const communitySelect = document.getElementById('communitySelect');
+            const charCounter = document.getElementById('charCounter');
+
+            const loadingMessages = [
+                'Анализируем соответствие текста аудитории и стилю сообщества...',
+                'Извлекаем параметры выбранного сообщества...',
+                'Оцениваем тон, лексику и подачу текста...',
+                'Формируем сильные стороны и замечания...',
+                'Подготавливаем рекомендации...',
+                'Почти готово...'
+            ];
+
+            let loadingInterval = null;
+
+            function updateCharCounter() {
+                charCounter.textContent = postText.value.length.toString();
             }
-        });
+
+            function startLoadingMessages() {
+                let index = 0;
+                loadingMessage.textContent = loadingMessages[index];
+
+                loadingInterval = setInterval(() => {
+                    index++;
+                    if (index < loadingMessages.length) {
+                        loadingMessage.textContent = loadingMessages[index];
+                    }
+                }, 7000);
+            }
+
+            function stopLoadingMessages() {
+                if (loadingInterval) {
+                    clearInterval(loadingInterval);
+                    loadingInterval = null;
+                }
+            }
+
+            function showLoading() {
+                loadingOverlay.classList.remove('d-none');
+                document.body.classList.add('loading-active');
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Проверка...';
+                startLoadingMessages();
+            }
+
+            function hideLoading() {
+                loadingOverlay.classList.add('d-none');
+                document.body.classList.remove('loading-active');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Проверить стиль';
+                stopLoadingMessages();
+            }
+
+            updateCharCounter();
+            postText.addEventListener('input', updateCharCounter);
+
+            form.addEventListener('submit', function () {
+                const text = postText.value.trim();
+                const communityId = communitySelect.value;
+
+                if (!communityId || !text) {
+                    hideLoading();
+                    return;
+                }
+
+                showLoading();
+            });
+
+            window.addEventListener('pageshow', function () {
+                hideLoading();
+            });
+        })();
     </script>
 }

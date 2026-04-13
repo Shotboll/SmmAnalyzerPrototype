@@ -11,12 +11,12 @@
     </div>
 
     <div class="editor-card">
-        <form asp-action="RegulationCheck" method="post">
+        <form asp-action="RegulationCheck" method="post" id="regulationForm">
             @Html.AntiForgeryToken()
 
             <div class="mb-3">
                 <label asp-for="CommunityId" class="form-label">Сообщество</label>
-                <select asp-for="CommunityId" class="form-select">
+                <select asp-for="CommunityId" class="form-select" id="communitySelect">
                     <option value="">Выберите сообщество</option>
                     @foreach (var community in Model.Communities)
                     {
@@ -28,12 +28,20 @@
 
             <div class="mb-3">
                 <label asp-for="Text" class="form-label">Текст поста</label>
-                <textarea asp-for="Text" class="form-control" placeholder="Введите текст поста для проверки..."></textarea>
+                <textarea asp-for="Text"
+                          class="form-control"
+                          id="postText"
+                          rows="12"
+                          maxlength="5000"
+                          placeholder="Введите текст поста для проверки..."></textarea>
+                <div class="form-text">
+                    <span id="charCounter">0</span> / 5000 символов
+                </div>
                 <span asp-validation-for="Text" class="text-danger"></span>
             </div>
 
             <div class="d-flex gap-2 flex-wrap">
-                <button type="submit" class="btn btn-primary">Проверить</button>
+                <button type="submit" class="btn btn-primary" id="submitButton">Проверить</button>
                 <a asp-action="RegulationCheck" class="btn btn-outline-secondary">Очистить</a>
             </div>
         </form>
@@ -112,15 +120,106 @@
     }
 </div>
 
+<div id="loadingOverlay" class="loading-overlay d-none">
+    <div class="loading-modal">
+        <div class="spinner-border text-primary loading-spinner" role="status">
+            <span class="visually-hidden">Загрузка...</span>
+        </div>
+
+        <h4 class="mt-3 mb-2">Идёт проверка по регламентам</h4>
+        <p class="text-muted mb-2" id="loadingMessage">
+            Выполняется анализ текста и поиск нарушений...
+        </p>
+        <small class="text-secondary">
+            Проверка может занять некоторое время.
+        </small>
+    </div>
+</div>
+
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+
     <script>
-        document.querySelector("form")?.addEventListener("submit", function () {
-            const btn = document.getElementById("submitBtn");
-            if (btn) {
-                btn.disabled = true;
-                btn.innerText = "Проверка...";
+        (function () {
+            const form = document.getElementById('regulationForm');
+            const submitBtn = document.getElementById('submitBtn');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingMessage = document.getElementById('loadingMessage');
+            const postText = document.getElementById('postText');
+            const communitySelect = document.getElementById('communitySelect');
+            const charCounter = document.getElementById('charCounter');
+
+            const loadingMessages = [
+                'Выполняется анализ текста и поиск нарушений...',
+                'Извлекаются подходящие регламенты сообщества...',
+                'Сравниваем текст поста с найденными правилами...',
+                'Формируем итоговый результат проверки...',
+                'Почти готово...'
+            ];
+
+            let loadingInterval = null;
+
+            function updateCharCounter() {
+                charCounter.textContent = postText.value.length.toString();
             }
-        });
+
+            function startLoadingMessages() {
+                let index = 0;
+                loadingMessage.textContent = loadingMessages[index];
+
+                loadingInterval = setInterval(() => {
+                    index++;
+                    if (index < loadingMessages.length) {
+                        loadingMessage.textContent = loadingMessages[index];
+                    }
+                }, 7000);
+            }
+
+            function stopLoadingMessages() {
+                if (loadingInterval) {
+                    clearInterval(loadingInterval);
+                    loadingInterval = null;
+                }
+            }
+
+            function showLoading() {
+                loadingOverlay.classList.remove('d-none');
+                document.body.classList.add('loading-active');
+
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Проверка...';
+
+                startLoadingMessages();
+            }
+
+            function hideLoading() {
+                loadingOverlay.classList.add('d-none');
+                document.body.classList.remove('loading-active');
+
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Проверить';
+
+                stopLoadingMessages();
+            }
+
+            updateCharCounter();
+            postText.addEventListener('input', updateCharCounter);
+
+            form.addEventListener('submit', function () {
+                const text = postText.value.trim();
+                const communityId = communitySelect.value;
+
+                if (!communityId || !text) {
+                    hideLoading();
+                    return;
+                }
+
+                showLoading();
+            });
+
+            window.addEventListener('pageshow', function () {
+                hideLoading();
+            });
+        })();
     </script>
 }

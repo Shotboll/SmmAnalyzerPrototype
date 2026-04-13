@@ -380,3 +380,45 @@ textarea.form-control {
         padding: 16px;
     }
 }
+
+/*========================================Загрузка===========================================*/
+
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1050;
+}
+
+.loading-modal {
+    width: 100%;
+    max-width: 480px;
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 32px 24px;
+    text-align: center;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+    border: 1px solid #e9ecef;
+}
+
+.loading-spinner {
+    width: 3rem;
+    height: 3rem;
+}
+
+.d-none {
+    display: none !important;
+}
+
+body.loading-active {
+    overflow: hidden;
+}
+
+#submitButton[disabled] {
+    opacity: 0.85;
+    cursor: not-allowed;
+}

@@ -29,7 +29,7 @@ namespace SmmAnalyzerPrototype.Api.Services
             var options = mode switch
             {
                 LlmMode.Strict => new { temperature = 0.1, top_p = 0.1, num_predict = 500, num_ctx = 4096 },
-                LlmMode.RAG => new { temperature = 0.1, top_p = 0.2, num_predict = 1500, num_ctx = 4096 },
+                LlmMode.RAG => new { temperature = 0.0, top_p = 0.2, num_predict = 1500, num_ctx = 4096 },
                 LlmMode.Creative => new { temperature = 0.8, top_p = 0.9, num_predict = 700, num_ctx = 4096 },
                 _ => new { temperature = 0.0, top_p = 0.1, num_predict = 500, num_ctx = 4096 }
             };

@@ -92,9 +92,25 @@ namespace RAGTEST.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(PostCreateModel model)
         {
+            model.Communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall") ?? new();
+
+            if (model.CommunityId == Guid.Empty)
+            {
+                ModelState.AddModelError(nameof(model.CommunityId), "Выберите сообщество.");
+            }
+
+            if (string.IsNullOrWhiteSpace(model.Text))
+            {
+                ModelState.AddModelError(nameof(model.Text), "Введите текст поста.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(model.Text) && model.Text.Length > 5000)
+            {
+                ModelState.AddModelError(nameof(model.Text), "Текст не должен превышать 5000 символов.");
+            }
+
             if (!ModelState.IsValid)
             {
-                model.Communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall") ?? new();
                 return View(model);
             }
 
@@ -104,21 +120,38 @@ namespace RAGTEST.Controllers
                 CommunityId = model.CommunityId
             };
 
-            var grammarResponse = await _client.PostAsJsonAsync("api/postapi/CheckGrammar", analyzeRequest);
-
-            if (!grammarResponse.IsSuccessStatusCode)
+            try
             {
-                model.Communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall") ?? new();
-                ViewBag.Error = "Ошибка при проверке грамматики.";
+                var grammarResponse = await _client.PostAsJsonAsync("api/postapi/CheckGrammar", analyzeRequest);
+
+                if (!grammarResponse.IsSuccessStatusCode)
+                {
+                    ViewBag.Error = "Ошибка при проверке грамматики.";
+                    return View(model);
+                }
+
+                var grammarResult = await grammarResponse.Content.ReadFromJsonAsync<EnhancedGrammarResponse>();
+
+                TempData["GrammarCards"] = JsonSerializer.Serialize(grammarResult?.Cards ?? new List<GrammarResultCardDto>());
+                TempData["SuspiciousGrammarCards"] = JsonSerializer.Serialize(grammarResult?.SuspiciousCards ?? new List<GrammarResultCardDto>());
+
+                return RedirectToAction("Analysis");
+            }
+            catch (TaskCanceledException)
+            {
+                ViewBag.Error = "Превышено время ожидания ответа от модели.";
                 return View(model);
             }
-
-            var grammarResult = await grammarResponse.Content.ReadFromJsonAsync<EnhancedGrammarResponse>();
-
-            TempData["GrammarCards"] = JsonSerializer.Serialize(grammarResult?.Cards ?? new List<GrammarResultCardDto>());
-            TempData["SuspiciousGrammarCards"] = JsonSerializer.Serialize(grammarResult?.SuspiciousCards ?? new List<GrammarResultCardDto>());
-
-            return RedirectToAction("Analysis");
+            catch (HttpRequestException)
+            {
+                ViewBag.Error = "Не удалось подключиться к сервису анализа.";
+                return View(model);
+            }
+            catch (Exception)
+            {
+                ViewBag.Error = "Произошла непредвиденная ошибка при анализе текста.";
+                return View(model);
+            }
         }
 
         // GET: /Post/Analysis
