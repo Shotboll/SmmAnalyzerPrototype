@@ -6,5 +6,6 @@
         public string RuleShort { get; set; } = string.Empty;
         public string MatchedText { get; set; } = string.Empty;
         public string Explanation { get; set; } = string.Empty;
+
     }
 }
