@@ -12,5 +12,7 @@
         public bool GrammarChecked { get; set; }
         public bool StyleChecked { get; set; }
         public bool RegulationChecked { get; set; }
+        public bool ForecastChecked { get; set; }
+        public bool RecommendationsChecked { get; set; }
     }
 }

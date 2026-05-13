@@ -50,7 +50,9 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 Status = p.Status,
                 GrammarChecked = p.AnalysisResult?.GrammarCheckedAt != null,
                 StyleChecked = p.AnalysisResult?.StyleCheckedAt != null,
-                RegulationChecked = p.AnalysisResult?.RegulationCheckedAt != null
+                RegulationChecked = p.AnalysisResult?.RegulationCheckedAt != null,
+                ForecastChecked = p.AnalysisResult?.ForecastCheckedAt != null,
+                RecommendationsChecked = p.AnalysisResult?.RecommendationsCheckedAt != null
             }).ToList();
 
             return Ok(result);
@@ -86,7 +88,9 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 StyleAssessment = post.AnalysisResult?.StyleAssessment,
                 StyleSummary = post.AnalysisResult?.StyleSummary,
                 HasRegulationViolations = post.AnalysisResult?.HasRegulationViolations,
-                RegulationComment = post.AnalysisResult?.RegulationComment
+                RegulationComment = post.AnalysisResult?.RegulationComment,
+                ForecastCheckedAt = post.AnalysisResult?.ForecastCheckedAt,
+                RecommendationsCheckedAt = post.AnalysisResult?.RecommendationsCheckedAt,
             };
 
             if (!string.IsNullOrWhiteSpace(post.AnalysisResult?.StyleStrengthsJson))
@@ -133,6 +137,51 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                         Explanation = x.Explanation
                     })
                     .ToList();
+            }
+
+            if (!string.IsNullOrWhiteSpace(post.AnalysisResult?.EngagementForecastJson))
+            {
+                try
+                {
+                    var forecast = JsonSerializer.Deserialize<EngagementForecastDto>(
+                        post.AnalysisResult.EngagementForecastJson,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    if (forecast != null)
+                    {
+                        dto.ForecastLevel = forecast.Level;
+                        dto.ForecastQualityScore = forecast.QualityScore;
+                        dto.ForecastLikes = forecast.ExpectedLikes;
+                        dto.ForecastComments = forecast.ExpectedComments;
+                        dto.ForecastViews = forecast.ExpectedViews;
+                        dto.ForecastERPercent = forecast.ExpectedERPercent;
+                        dto.ForecastReasoning = forecast.Reasoning;
+                        dto.ForecastKeyFactors = forecast.KeyFactors ?? new();
+                        dto.ForecastRisks = forecast.Risks ?? new();
+                        dto.ForecastComparison = forecast.ComparisonWithAvg;
+                    }
+                }
+                catch { /* Игнорируем ошибки парсинга старого формата */ }
+            }
+
+            if (!string.IsNullOrWhiteSpace(post.AnalysisResult?.RecommendationsJson))
+            {
+                try
+                {
+                    var recs = JsonSerializer.Deserialize<ContentRecommendationsDto>(
+                        post.AnalysisResult.RecommendationsJson,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    if (recs != null)
+                    {
+                        dto.RecommendationsText = recs.TextImprovements ?? new();
+                        dto.RecommendationsStruct = recs.StructuralChanges ?? new();
+                        dto.RecommendationsTopics = recs.TopicIdeas ?? new();
+                        dto.RecommendationsBoosters = recs.EngagementBoosters ?? new();
+                        dto.RecommendationsAdvice = recs.OverallAdvice;
+                    }
+                }
+                catch { /* Игнорируем ошибки парсинга старого формата */ }
             }
 
             return Ok(dto);
@@ -502,6 +551,48 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 sentence = sentence.Substring(0, 300).Trim();
 
             return sentence;
+        }
+
+        // ===== ПРОГНОЗ ВОВЛЕЧЕННОСТИ =====
+        [HttpPost("{postId}")]
+        public async Task<ActionResult<EngagementForecastDto>> RunForecast(Guid postId)
+        {
+            var post = await _context.Posts.Include(p => p.AnalysisResult).FirstOrDefaultAsync(p => p.Id == postId);
+            if (post == null) return NotFound();
+
+            var forecast = await _llmService.ForecastEngagementAsync(post.CommunityId, post.Text, 30, HttpContext.RequestAborted);
+
+            var result = post.AnalysisResult ?? new AnalysisResult { PostId = postId };
+            result.EngagementForecastJson = JsonSerializer.Serialize(forecast);
+            result.ForecastCheckedAt = DateTime.UtcNow;
+            result.UpdatedAt = DateTime.UtcNow;
+            post.Status = "Analyzed";
+
+            if (post.AnalysisResult == null) _context.AnalysisResults.Add(result);
+            await _context.SaveChangesAsync();
+
+            return Ok(forecast);
+        }
+
+        // ===== РЕКОМЕНДАЦИИ ПО КОНТЕНТУ =====
+        [HttpPost("{postId}")]
+        public async Task<ActionResult<ContentRecommendationsDto>> RunRecommendations(Guid postId)
+        {
+            var post = await _context.Posts.Include(p => p.AnalysisResult).FirstOrDefaultAsync(p => p.Id == postId);
+            if (post == null) return NotFound();
+
+            var recs = await _llmService.GenerateRecommendationsAsync(post.CommunityId, post.Text, 30, HttpContext.RequestAborted);
+
+            var result = post.AnalysisResult ?? new AnalysisResult { PostId = postId };
+            result.RecommendationsJson = JsonSerializer.Serialize(recs);
+            result.RecommendationsCheckedAt = DateTime.UtcNow;
+            result.UpdatedAt = DateTime.UtcNow;
+            post.Status = "Analyzed";
+
+            if (post.AnalysisResult == null) _context.AnalysisResults.Add(result);
+            await _context.SaveChangesAsync();
+
+            return Ok(recs);
         }
     }
 }

@@ -9,6 +9,9 @@ namespace SmmAnalyzerPrototype.Data.Models
         [Key]
         public Guid Id { get; set; } = Guid.NewGuid();
 
+        [Column("vk_post_id")]
+        public long? VkPostId { get; set; }
+
         [Required]
         [MaxLength(50)]
         public string Source { get; set; } = string.Empty;

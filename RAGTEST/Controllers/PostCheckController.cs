@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using RAGTEST.Models;
 using SmmAnalyzerPrototype.Data.Models.DTO.Post;
+using System.Text.Json;
 
 namespace RAGTEST.Controllers
 {
@@ -220,6 +221,82 @@ namespace RAGTEST.Controllers
             model.Comment = result?.Comment ?? string.Empty;
             model.Violations = result?.Violations ?? new List<ViolationDto>();
 
+            return View(model);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Forecast(Guid postId)
+        {
+            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{postId}");
+            if (post == null) return NotFound();
+
+            return View(new ForecastPageModel
+            {
+                PostId = post.Id,
+                CommunityName = post.CommunityName,
+                Text = post.Text,
+                ForecastCheckedAt = post.ForecastCheckedAt
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Forecast(ForecastPageModel model)
+        {
+            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{model.PostId}");
+            if (post == null) return NotFound();
+
+            model.CommunityName = post.CommunityName;
+            model.Text = post.Text;
+
+            var response = await _client.PostAsync($"api/postapi/runforecast/{model.PostId}", null);
+            if (response.IsSuccessStatusCode)
+            {
+                model.Result = await response.Content.ReadFromJsonAsync<EngagementForecastDto>();
+                model.ForecastCheckedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                model.ErrorMessage = "Ошибка при генерации прогноза.";
+            }
+            return View(model);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Recommendations(Guid postId)
+        {
+            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{postId}");
+            if (post == null) return NotFound();
+
+            return View(new RecommendationsPageModel
+            {
+                PostId = post.Id,
+                CommunityName = post.CommunityName,
+                Text = post.Text,
+                RecommendationsCheckedAt = post.RecommendationsCheckedAt
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Recommendations(RecommendationsPageModel model)
+        {
+            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{model.PostId}");
+            if (post == null) return NotFound();
+
+            model.CommunityName = post.CommunityName;
+            model.Text = post.Text;
+
+            var response = await _client.PostAsync($"api/postapi/runrecommendations/{model.PostId}", null);
+            if (response.IsSuccessStatusCode)
+            {
+                model.Result = await response.Content.ReadFromJsonAsync<ContentRecommendationsDto>();
+                model.RecommendationsCheckedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                model.ErrorMessage = "Ошибка при генерации рекомендаций.";
+            }
             return View(model);
         }
     }

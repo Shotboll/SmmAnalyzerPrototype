@@ -22,6 +22,12 @@ namespace SmmAnalyzerPrototype.Data.Models
         [Column("regulation_checked_at")]
         public DateTime? RegulationCheckedAt { get; set; }
 
+        [Column("forecast_checked_at")]
+        public DateTime? ForecastCheckedAt { get; set; }
+
+        [Column("recommendations_checked_at")]
+        public DateTime? RecommendationsCheckedAt { get; set; }
+
         [MaxLength(100)]
         [Column("style_assessment")]
         public string? StyleAssessment { get; set; }
@@ -44,9 +50,8 @@ namespace SmmAnalyzerPrototype.Data.Models
         [Column("regulation_comment", TypeName = "text")]
         public string? RegulationComment { get; set; }
 
-        [MaxLength(100)]
-        [Column("engagement_forecast")]
-        public string? EngagementForecast { get; set; }
+        [Column("engagement_forecast", TypeName = "text")]
+        public string? EngagementForecastJson { get; set; }
 
         [Column("recommendations_json", TypeName = "text")]
         public string? RecommendationsJson { get; set; }

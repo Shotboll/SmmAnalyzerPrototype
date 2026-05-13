@@ -25,5 +25,24 @@
 
         public List<GrammarErrorDto> GrammarErrors { get; set; } = new();
         public List<ViolationDto> RegulationViolations { get; set; } = new();
+
+        public DateTime? ForecastCheckedAt { get; set; }
+        public DateTime? RecommendationsCheckedAt { get; set; }
+        public string? ForecastLevel { get; set; }
+        public int ForecastLikes { get; set; }
+        public int ForecastComments { get; set; }
+        public int ForecastViews { get; set; }
+        public double ForecastERPercent { get; set; }
+        public string? ForecastReasoning { get; set; }
+        public List<string> ForecastKeyFactors { get; set; } = new();
+        public List<string> ForecastRisks { get; set; } = new();
+        public string? ForecastComparison { get; set; }
+        public int ForecastQualityScore { get; set; }
+
+        public List<string> RecommendationsText { get; set; } = new();
+        public List<string> RecommendationsStruct { get; set; } = new();
+        public List<string> RecommendationsTopics { get; set; } = new();
+        public List<string> RecommendationsBoosters { get; set; } = new();
+        public string? RecommendationsAdvice { get; set; }
     }
 }

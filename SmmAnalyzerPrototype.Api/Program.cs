@@ -21,7 +21,7 @@ builder.Services.AddHttpClient<IEmbeddingService, E5EmbeddingService>(client =>
 
 builder.Services.AddHttpClient<LanguageToolService>();
 
-builder.Services.AddSingleton<VkService>();
+builder.Services.AddScoped<VkService>();
 
 builder.Services.AddScoped<GrammarFalsePositiveFilterService>();
 

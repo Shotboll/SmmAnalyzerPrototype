@@ -52,6 +52,14 @@
             <a asp-controller="PostCheck" asp-action="Regulations" asp-route-postId="@Model.Id" class="btn btn-primary">
                 Проверка регламентов
             </a>
+
+            <a asp-controller="PostCheck" asp-action="Forecast" asp-route-postId="@Model.Id" class="btn btn-outline-primary">
+                📊 Прогноз вовлеченности
+            </a>
+            <a asp-controller="PostCheck" asp-action="Recommendations" asp-route-postId="@Model.Id" class="btn btn-outline-primary">
+                💡 Рекомендации
+            </a>
+
             <a asp-controller="Post" asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-outline-primary">
                 Редактировать пост
             </a>
@@ -284,6 +292,134 @@
                 {
                     <div class="empty-state">Совпадений с нарушениями не найдено.</div>
                 }
+            }
+        </div>
+    </div>
+
+    <div class="app-card">
+        <div class="app-card-body">
+            <div class="details-section-head mb-3">
+                <div>
+                    <h3 class="section-card-title mb-1">Прогноз вовлеченности</h3>
+                    @if (Model.ForecastCheckedAt != null)
+                    {
+                        <div class="section-state success">Прогноз сформирован</div>
+                        <div class="section-time">@Model.ForecastCheckedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                    }
+                    else
+                    {
+                        <div class="section-state neutral">Прогноз ещё не рассчитывался</div>
+                    }
+                </div>
+            </div>
+
+            @if (Model.ForecastCheckedAt != null)
+            {
+                <div class="d-flex flex-column gap-3">
+                    <div class="summary-panel">
+                        <div class="fw-semibold mb-2">Уровень вовлеченности</div>
+                        <div>@Model.ForecastLevel</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="fw-semibold mb-2">Качество контента</div>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="progress flex-grow-1" style="height: 8px;">
+                                @{
+                                    var progressClass = Model.ForecastQualityScore switch
+                                    {
+                                        >= 80 => "bg-success",
+                                        >= 60 => "bg-primary",
+                                        >= 40 => "bg-warning",
+                                        _ => "bg-danger"
+                                    };
+                                }
+                                <div class="progress-bar @progressClass" role="progressbar"
+                                     style="width: @Model.ForecastQualityScore%"
+                                     aria-valuenow="@Model.ForecastQualityScore" aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                            <span class="fw-bold">@Model.ForecastQualityScore/100</span>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="inner-card text-center">
+                                <div class="text-muted small">Ожидаемые лайки</div>
+                                <div class="fw-bold fs-5">👍 @Model.ForecastLikes</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="inner-card text-center">
+                                <div class="text-muted small">Комментарии</div>
+                                <div class="fw-bold fs-5">💬 @Model.ForecastComments</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="inner-card text-center">
+                                <div class="text-muted small">ER</div>
+                                <div class="fw-bold fs-5">@Model.ForecastERPercent%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="app-card">
+        <div class="app-card-body">
+            <div class="details-section-head mb-3">
+                <div>
+                    <h3 class="section-card-title mb-1">Рекомендации</h3>
+                    @if (Model.RecommendationsCheckedAt != null)
+                    {
+                        <div class="section-state success">Рекомендации сформированы</div>
+                        <div class="section-time">@Model.RecommendationsCheckedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                    }
+                    else
+                    {
+                        <div class="section-state neutral">Рекомендации ещё не сформированы</div>
+                    }
+                </div>
+            </div>
+
+            @if (Model.RecommendationsCheckedAt != null)
+            {
+                <div class="row g-3">
+                    <div class="col-lg-6">
+                        <div class="inner-card h-100">
+                            <h5 class="mb-3">Правки текста</h5>
+                            @if (Model.RecommendationsText.Any())
+                            {
+                                <ul class="mb-0 ps-3">@foreach(var i in Model.RecommendationsText){<li class="mb-2">@i</li>}</ul>
+                            }
+                            else
+                            {
+
+                                <p class="text-muted mb-0">Не выделено.</p>
+                            }
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="inner-card h-100">
+                            <h5 class="mb-3">Структурные изменения</h5>
+                            @if (Model.RecommendationsStruct.Any())
+                            {
+                                <ul class="mb-0 ps-3">@foreach(var i in Model.RecommendationsStruct){<li class="mb-2">@i</li>}</ul>
+                            }
+                            else
+                            {
+                                <p class="text-muted mb-0">Не выделено.</p>
+                            }
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="inner-card">
+                            <h5 class="mb-3">Общий совет</h5>
+                            <div>@Model.RecommendationsAdvice</div>
+                        </div>
+                    </div>
+                </div>
             }
         </div>
     </div>

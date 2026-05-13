@@ -1,5 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SmmAnalyzerPrototype.Data.Data;
+using SmmAnalyzerPrototype.Data.Models;
+using SmmAnalyzerPrototype.Data.Models.DTO.Community;
 using SmmAnalyzerPrototype.Data.Models.DTO.Post;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -23,7 +25,7 @@ namespace SmmAnalyzerPrototype.Api.Services
             _model = configuration["Llm:Model"] ?? "saiga_nemo_12b";
         }
 
-        public enum LlmMode { Strict, Creative, RAG }
+        public enum LlmMode { Strict, Creative, RAG, Forecast }
 
         public async Task<string> CallLlmAsync(string prompt, LlmMode mode, object? format = null)
         {
@@ -32,6 +34,7 @@ namespace SmmAnalyzerPrototype.Api.Services
                 LlmMode.Strict => new { temperature = 0.0, top_p = 0.1, num_predict = 500, num_ctx = 4096 },
                 LlmMode.RAG => new { temperature = 0.0, top_p = 0.1, num_predict = 900, num_ctx = 4096 },
                 LlmMode.Creative => new { temperature = 0.8, top_p = 0.9, num_predict = 700, num_ctx = 4096 },
+                LlmMode.Forecast => new { temperature = 0.3, top_p = 0.85, num_predict = 600, num_ctx = 4096 },
                 _ => new { temperature = 0.0, top_p = 0.1, num_predict = 500, num_ctx = 4096 }
             };
 
@@ -687,6 +690,255 @@ namespace SmmAnalyzerPrototype.Api.Services
                     : (!string.IsNullOrWhiteSpace(message) ? message : "Проверьте этот фрагмент вручную.")
             };
         }
-        
+
+        /// <summary>
+        /// Расширенный прогноз вовлеченности на основе истории сообщества.
+        /// Соответствует функции 8 (п. 1.3.2 ВКР) и алгоритму 2.3.3 (Рис. 5).
+        /// </summary>
+        public async Task<EngagementForecastDto> ForecastEngagementAsync(
+            Guid communityId,
+            string newPostText,
+            int historyDays = 30,
+            CancellationToken ct = default)
+        {
+            var (metrics, topPosts, community) = await LoadContextAsync(communityId, newPostText, historyDays, ct);
+
+            var prompt = $$"""
+                    Ты — аналитик социальных сетей. Оцени потенциальную вовлеченность поста ДЛЯ КОНКРЕТНОГО СООБЩЕСТВА.
+
+                    ПРОФИЛЬ СООБЩЕСТВА:
+                    • Целевая аудитория: {{community.TargetAudience}}
+                    • Стиль общения: {{community.StyleProfile}}
+                    • Средние метрики (30 дней): лайки {{metrics.AvgLikes}}, комментарии {{metrics.AvgComments}}, просмотры {{metrics.AvgViews}}, ER {{metrics.AvgER}}%
+                    • Топ-3 поста по вовлеченности:
+                    {{string.Join("\n", topPosts.Select((p, i) => $"{i + 1}. «{p.ShortText}» (лайки {p.Likes}, комментарии {p.Comments})"))}}
+
+                    НОВЫЙ ТЕКСТ:
+                    {{newPostText}}
+
+                    ❗ КРИТЕРИИ ОЦЕНКИ (оценивай ОТНОСИТЕЛЬНО профиля сообщества, а не абсолютно):
+
+                    СНИЖАЮТ оценку (–15…–40 баллов), если есть ЛЮБОЙ из признаков:
+                    - Контент не соответствует тематике/интересам указанной ЦА
+                    - Тон/стиль текста противоречит заявленному стилю общения сообщества
+                    - Отсутствие ясной цели или призыва к действию, релевантного данной аудитории
+                    - Избыточная сложность или, наоборот, примитивность для данной ЦА
+                    - Контент, который может вызвать отторжение у данной аудитории (определи по контексту)
+
+                    ПОВЫШАЮТ оценку (+15…+40 баллов), если есть:
+                    - Явное соответствие теме/интересам ЦА и стилю сообщества
+                    - Конкретные факты, цифры, доказательства, релевантные для данной аудитории
+                    - Четкий призыв к действию, уместный для этого сообщества
+                    - Хорошая структура: заголовок, логика, визуальные акценты (если уместно по стилю)
+                    - Эмоциональная подача, соответствующая ожидаемому тону сообщества
+
+                    ПРАВИЛА:
+                    1. Не оценивай текст «вообще». Оценивай: «Насколько этот текст подойдет именно ЭТОЙ аудитории в ЭТОМ стиле?»
+                    2. Сравни пост с топ-3. Если по теме/стилю/подаче близок к лидеру → 75–95. Если выбивается из контекста → <40.
+                    3. «Политика», «коммерция», «юмор» — не являются автоматически «плохими» или «хорошими». Оценивай их уместность для данного сообщества.
+                    4. Если в тексте есть явные ошибки, токсичность или спам — снижай оценку независимо от тематики.
+
+                    ШКАЛА (используй ВЕСЬ диапазон 0–100):
+                    0–20  | Критическое несоответствие: контент чужероден для ЦА/стиля, есть ошибки/спам
+                    21–40 | Низкий: текст уместен, но нет ценности, структуры или призыва для этой ЦА
+                    41–60 | Средний: стандартный пост, соответствует профилю, но без «крючка»
+                    61–80 | Высокий: хорошая структура, ценность, элементы вовлечения, соответствует стилю
+                    81–100| Отличный: идеально под ЦА + структура + факты/эмоции + четкий уместный призыв
+
+                    ВЕРНИ СТРОГО JSON:
+                    {
+                      "level": "string", // ОЧЕНЬ НИЗКИЙ / НИЗКИЙ / СРЕДНИЙ / ВЫСОКИЙ / ОЧЕНЬ ВЫСОКИЙ
+                      "quality_score": int, // 0–100, используй весь диапазон
+                      "expected_likes": int,
+                      "expected_comments": int,
+                      "expected_views": int,
+                      "expected_er_percent": double,
+                      "confidence": double,
+                      "reasoning": "string", // Объясни, почему оценка такая, ссылаясь на ЦА и стиль
+                      "key_factors": ["string"], // 2-3 фактора, влияющих на прогноз
+                      "risks": ["string"], // 1-2 риска для вовлеченности
+                      "comparison_with_avg": "string" // Вид: "+15% к лайкам" или "ниже среднего из-за..."
+                    }
+                    """;
+
+            var schema = new
+            {
+                type = "object",
+                properties = new
+                {
+                    level = new { type = "string" },
+                    expected_likes = new { type = "integer" },
+                    quality_score = new { type = "integer" },
+                    expected_comments = new { type = "integer" },
+                    expected_views = new { type = "integer" },
+                    expected_er_percent = new { type = "number" },
+                    confidence = new { type = "number" },
+                    reasoning = new { type = "string" },
+                    key_factors = new { type = "array", items = new { type = "string" } },
+                    risks = new { type = "array", items = new { type = "string" } },
+                    comparison_with_avg = new { type = "string" }
+                },
+                required = new[] { "level", "quality_score", "expected_likes", "expected_comments", "expected_views", "expected_er_percent", "confidence", "reasoning", "key_factors", "risks", "comparison_with_avg" }
+            };
+
+            return await ParseLlmResponseAsync<EngagementForecastDto>(prompt, schema, ct);
+        }
+
+        /// <summary>
+        /// Генерация рекомендаций по улучшению текста и подбору тем.
+        /// Соответствует функции 9 (п. 1.3.2 ВКР) и алгоритму 2.3.3 (Рис. 5).
+        /// </summary>
+        public async Task<ContentRecommendationsDto> GenerateRecommendationsAsync(
+            Guid communityId,
+            string newPostText,
+            int historyDays = 30,
+            CancellationToken ct = default)
+        {
+            var (metrics, topPosts, community) = await LoadContextAsync(communityId, newPostText, historyDays, ct);
+
+            var prompt = $$"""
+                    Ты — SMM-стратег и редактор. Дай практические рекомендации по улучшению поста.
+
+                    КОНТЕКСТ:
+                    • ЦА: {{community?.TargetAudience ?? "не указана"}}
+                    • Стиль: {{community?.StyleProfile ?? "не указан"}}
+                    • Средние метрики: лайки {{metrics.AvgLikes:F0}}, комментарии {{metrics.AvgComments:F0}}, просмотры {{metrics.AvgViews:F0}}
+                    • Что обычно работает: {{string.Join(", ", topPosts.Take(2).Select(p => $"«{p.ShortText}»"))}}
+
+                    ТЕКСТ ДЛЯ УЛУЧШЕНИЯ:
+                    {{newPostText}}
+
+                    ЗАДАЧА:
+                    1. Конкретные правки текста (лексика, тон, ясность).
+                    2. Структурные изменения (заголовок, абзацы, CTA).
+                    3. 2-3 смежные темы, которые могут сработать.
+                    4. Приёмы повышения вовлеченности (опрос, вопрос, медиа, хештеги).
+                    5. Общий совет по публикации.
+
+                    Верни СТРОГО JSON:
+                    {
+                        "text_improvements": ["string"],
+                        "structural_changes": ["string"],
+                        "topic_ideas": ["string"],
+                        "engagement_boosters": ["string"],
+                        "overall_advice": "string"
+                    }
+                    """;
+
+            var schema = new
+            {
+                type = "object",
+                properties = new
+                {
+                    textImprovements = new { type = "array", items = new { type = "string" }, minItems = 3 },
+                    structuralChanges = new { type = "array", items = new { type = "string" }, minItems = 2 },
+                    topicIdeas = new { type = "array", items = new { type = "string" }, minItems = 2 },
+                    engagementBoosters = new { type = "array", items = new { type = "string" }, minItems = 2 },
+                    overallAdvice = new { type = "string" }
+                },
+                required = new[] { "textImprovements", "structuralChanges", "topicIdeas", "engagementBoosters", "overallAdvice" }
+            };
+
+            return await ParseLlmResponseAsync<ContentRecommendationsDto>(prompt, schema, ct);
+        }
+
+        private async Task<(CommunityMetricsDto Metrics, List<SamplePostDto> TopPosts, Community? Community)>LoadContextAsync(Guid communityId, string text, int historyDays, CancellationToken ct)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-historyDays);
+            var posts = await _context.CommunityPosts
+                .Where(p => p.CommunityId == communityId && p.PublishedAt >= cutoff)
+                .OrderByDescending(p => p.PublishedAt)
+                .ToListAsync(ct);
+
+            var total = posts.Count;
+            var avgLikes = total > 0 ? posts.Average(p => p.Likes) : 0;
+            var avgComments = total > 0 ? posts.Average(p => p.Comments) : 0;
+            var avgViews = total > 0 ? posts.Average(p => p.Views) : 0;
+            var avgER = avgViews > 0 ? (avgLikes + avgComments * 2) / avgViews * 100 : 0;
+
+            var metrics = new CommunityMetricsDto
+            {
+                TotalPosts = total,
+                PostsPerWeek = total / (historyDays / 7.0),
+                AvgLikes = Math.Round(avgLikes, 1),
+                AvgComments = Math.Round(avgComments, 1),
+                AvgViews = Math.Round(avgViews, 0),
+                AvgER = Math.Round(avgER, 2)
+            };
+
+            var topPosts = posts
+                .OrderByDescending(p => p.Likes + p.Comments * 2)
+                .Take(3)
+                .Select(p => new SamplePostDto
+                {
+                    ShortText = p.Text,
+                    Likes = p.Likes,
+                    Comments = p.Comments
+                })
+                .ToList();
+
+            var community = await _context.Communities.FindAsync(communityId, ct);
+            return (metrics, topPosts, community);
+        }
+
+        private async Task<T> ParseLlmResponseAsync<T>(string prompt, object schema, CancellationToken ct)
+        {
+            // 1. Получаем сырой ответ от Ollama
+            var raw = await CallLlmAsync(prompt, LlmMode.Forecast, schema);
+
+            // 2. CallLlmAsync уже извлек поле "response" из wrapper-ответа Ollama
+            //    Но если там остался внешний JSON-обёртка — извлекаем внутренний ответ
+             var json = raw.Trim();
+
+            // Если ответ начинается с { и содержит поле "response" — это wrapper Ollama
+            if (json.StartsWith("{") && json.Contains("\"response\""))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("response", out var responseElement))
+                    {
+                        json = responseElement.GetString()?.Trim() ?? json;
+                    }
+                }
+                catch
+                {
+                    // Если не получилось распарсить — пробуем как есть
+                }
+            }
+
+            // 3. Пробуем десериализовать
+            try
+            {
+                var result = System.Text.Json.JsonSerializer.Deserialize<T>(json, new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (result != null) return result;
+            }
+            catch (Exception ex)
+            {
+                // Логируем ошибку для отладки
+                Console.WriteLine($"❌ Ошибка десериализации: {ex.Message}");
+                Console.WriteLine($"📦 JSON: {json}");
+            }
+
+            // 4. Fallback: возвращаем пустой объект с предупреждением
+            var fallback = Activator.CreateInstance<T>()!;
+            var typeName = typeof(T).Name;
+
+            if (typeName.Contains("Forecast"))
+            {
+                ((dynamic)fallback).Level = "ошибка парсинга";
+                ((dynamic)fallback).Reasoning = "Не удалось обработать ответ модели";
+            }
+            else if (typeName.Contains("Recommendation"))
+            {
+                ((dynamic)fallback).OverallAdvice = "Попробуйте переформулировать запрос";
+            }
+
+            return fallback;
+        }
     }
 }

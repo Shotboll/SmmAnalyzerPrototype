@@ -1,0 +1,189 @@
+﻿@model RAGTEST.Models.ForecastPageModel
+@{
+    ViewData["Title"] = "Прогноз вовлеченности";
+}
+
+<div class="container py-4">
+    <div class="mb-4">
+        <h1 class="fw-bold mb-2">Прогноз вовлеченности</h1>
+        <p class="text-muted mb-0">Оценка потенциальной реакции аудитории на публикацию.</p>
+    </div>
+
+    <div class="row g-4">
+        <!-- Левая колонка: параметры и форма -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm border-0 rounded-4">
+                <div class="card-body p-4">
+                    <h4 class="card-title mb-4">Параметры анализа</h4>
+
+                    <div class="mb-3">
+                        <div class="text-muted small">Сообщество</div>
+                        <div class="fw-semibold">@Model.CommunityName</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="text-muted small mb-2">Текст поста</div>
+                        <div class="border rounded-4 p-3 bg-light" style="white-space: pre-wrap;">@Model.Text</div>
+                    </div>
+
+                    <form asp-action="Forecast" method="post" id="forecastForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="postId" value="@Model.PostId" />
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg rounded-3" id="submitBtn">
+                                📊 Сгенерировать прогноз
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="mt-3">
+                        <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="btn btn-outline-secondary">
+                            Назад к посту
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Правая колонка: результат -->
+        <div class="col-lg-7">
+            <div class="card shadow-sm border-0 rounded-4 h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <h4 class="card-title mb-0">Результат прогноза</h4>
+
+                        @if (Model.Result != null)
+                        {
+                            var levelClass = Model.Result.Level?.ToLower() switch
+                            {
+                                "низкий" => "bg-danger-subtle text-danger",
+                                "средний" => "bg-warning-subtle text-warning",
+                                "высокий" => "bg-success-subtle text-success",
+                                _ => "bg-secondary-subtle text-secondary"
+                            };
+                            <span class="badge rounded-pill px-3 py-2 @levelClass">
+                                @Model.Result.Level
+                            </span>
+                        }
+                    </div>
+
+                    @if (Model.Result != null)
+                    {
+                        <!-- Обоснование -->
+                        <div class="mb-4">
+                            <div class="p-3 bg-light rounded-4 border">
+                                <div class="fw-semibold mb-2">Обоснование</div>
+                                <div>@Model.Result.Reasoning</div>
+                            </div>
+                        </div>
+
+                        <!-- Метрики -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-6 col-md-3">
+                                <div class="border rounded-4 p-3 text-center bg-white">
+                                    <div class="text-muted small">Ожидаемые лайки</div>
+                                    <div class="fw-bold fs-5">👍 @Model.Result.ExpectedLikes</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="border rounded-4 p-3 text-center bg-white">
+                                    <div class="text-muted small">Комментарии</div>
+                                    <div class="fw-bold fs-5">💬 @Model.Result.ExpectedComments</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="border rounded-4 p-3 text-center bg-white">
+                                    <div class="text-muted small">Просмотры</div>
+                                    <div class="fw-bold fs-5">👁️ @Model.Result.ExpectedViews</div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="border rounded-4 p-3 text-center bg-white">
+                                    <div class="text-muted small">ER</div>
+                                    <div class="fw-bold fs-5">@Model.Result.ExpectedERPercent.ToString("F1")%</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Факторы и риски -->
+                        @if (Model.Result.KeyFactors.Any())
+                        {
+                            <div class="border rounded-4 p-3 mb-3 bg-white">
+                                <h5 class="mb-3">Ключевые факторы</h5>
+                                <ul class="mb-0 ps-3">
+                                    @foreach (var f in Model.Result.KeyFactors)
+                                    {
+                                        <li class="mb-2">@f</li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+                        @if (Model.Result.Risks.Any())
+                        {
+                            <div class="border rounded-4 p-3 mb-3 bg-white">
+                                <h5 class="mb-3">Риски</h5>
+                                <ul class="mb-0 ps-3">
+                                    @foreach (var r in Model.Result.Risks)
+                                    {
+                                        <li class="mb-2">@r</li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.Result.ComparisonWithAvg))
+                        {
+                            <div class="p-3 bg-light rounded-4 border">
+                                <div class="fw-semibold mb-2">Сравнение со средним</div>
+                                <div>@Model.Result.ComparisonWithAvg</div>
+                            </div>
+                        }
+                    }
+                    else if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+                    {
+                        <div class="alert alert-danger">@Model.ErrorMessage</div>
+                    }
+                    else
+                    {
+                        <div class="d-flex align-items-center justify-content-center h-100">
+                            <div class="text-center text-muted py-5">
+                                <div class="fs-5 fw-semibold mb-2">Пока нет результата</div>
+                                <div>Нажмите кнопку запуска анализа.</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@await Html.PartialAsync("_LoadingOverlay", new RAGTEST.Models.LoadingOverlayViewModel
+{
+    OverlayId = "forecastLoadingOverlay",
+    MessageId = "forecastLoadingMessage",
+    Title = "Идёт генерация прогноза",
+    InitialMessage = "Анализируем историю публикаций и формируем прогноз...",
+    Hint = "Прогноз может занять некоторое время, так как используется локальная модель."
+})
+
+@section Scripts {
+    <script>
+        initLoadingForm({
+            formId: "forecastForm",
+            submitButtonId: "submitBtn",
+            overlayId: "forecastLoadingOverlay",
+            messageId: "forecastLoadingMessage",
+            submitText: "📊 Сгенерировать прогноз",
+            loadingButtonText: "Генерация...",
+            messages: [
+                "Анализируем историю публикаций сообщества...",
+                "Извлекаем метрики вовлеченности за последние 30 дней...",
+                "Формируем промпт для языковой модели...",
+                "Оцениваем потенциальную реакцию аудитории...",
+                "Подготавливаем итоговый прогноз...",
+                "Почти готово..."
+            ]
+        });
+    </script>
+}

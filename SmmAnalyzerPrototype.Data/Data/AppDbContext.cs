@@ -82,6 +82,11 @@ namespace SmmAnalyzerPrototype.Data.Data
                 .WithOne(rc => rc.Regulation)
                 .HasForeignKey(rc => rc.RegulationId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CommunityPost>()
+                .HasIndex(cp => new { cp.CommunityId, cp.VkPostId })
+                .IsUnique()
+                .HasDatabaseName("uq_community_posts_community_vk");
         }
     }
 }

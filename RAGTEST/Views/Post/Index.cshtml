@@ -77,6 +77,12 @@ else
                                     <span class="mini-check @(post.RegulationChecked ? "done" : "pending")">
                                         Регламенты: @(post.RegulationChecked ? "выполнено" : "нет")
                                     </span>
+                                    <span class="mini-check @(post.ForecastChecked ? "done" : "pending")">
+                                        Прогноз: @(post.ForecastChecked ? "выполнено" : "нет")
+                                    </span>
+                                    <span class="mini-check @(post.RecommendationsChecked ? "done" : "pending")">
+                                        Рекомендации: @(post.RecommendationsChecked ? "выполнено" : "нет")
+                                    </span>
                                 </div>
                             </td>
 

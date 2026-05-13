@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pgvector;
@@ -12,9 +13,11 @@ using SmmAnalyzerPrototype.Data.Data;
 namespace SmmAnalyzerPrototype.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260505101510_UpdDatabase")]
+    partial class UpdDatabase
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -31,12 +34,9 @@ namespace SmmAnalyzerPrototype.Data.Migrations
                         .HasColumnName("post_id");
 
                     b.Property<string>("EngagementForecast")
-                        .HasColumnType("text")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("engagement_forecast");
-
-                    b.Property<DateTime?>("ForecastCheckedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("forecast_checked_at");
 
                     b.Property<DateTime?>("GrammarCheckedAt")
                         .HasColumnType("timestamp with time zone")
@@ -45,10 +45,6 @@ namespace SmmAnalyzerPrototype.Data.Migrations
                     b.Property<bool?>("HasRegulationViolations")
                         .HasColumnType("boolean")
                         .HasColumnName("has_regulation_violations");
-
-                    b.Property<DateTime?>("RecommendationsCheckedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("recommendations_checked_at");
 
                     b.Property<string>("RecommendationsJson")
                         .HasColumnType("text")
