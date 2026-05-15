@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 
 namespace SmmAnalyzerPrototype.Data.Models.DTO.Community
 {
-    public class UpdateCommunityRequest : CreateCommunityRequest { }
+    public class UpdateCommunityRequest : CreateCommunityRequest
+    {
+    }
 
 }

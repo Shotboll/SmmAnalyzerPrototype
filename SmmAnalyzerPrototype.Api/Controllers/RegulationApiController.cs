@@ -25,27 +25,55 @@ namespace SmmAnalyzerPrototype.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<List<RegulationDocumentDto>>> GetAll([FromQuery] Guid? communityId)
         {
-            var query = _context.RegulationDocuments.AsQueryable();
+            var userId = GetCurrentUserId();
+            if (userId == null)
+                return Unauthorized("Пользователь не определен.");
+
+            var query = _context.RegulationDocuments
+                .Include(r => r.Community)
+                .AsQueryable();
+
+            query = query.Where(r => r.Community.UserId == userId.Value);
+
             if (communityId.HasValue)
                 query = query.Where(r => r.CommunityId == communityId.Value);
 
             var docs = await query.ToListAsync();
-            return Ok(docs.Select(MapToDto));
+
+            return Ok(docs.Select(MapToDto).ToList());
         }
 
         [HttpGet("{id}")]
         public async Task<ActionResult<RegulationDocumentDto>> GetById(Guid id)
         {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+                return Unauthorized("Пользователь не определен.");
+
             var doc = await _context.RegulationDocuments
+                .Include(r => r.Community)
                 .Include(r => r.Chunks)
-                .FirstOrDefaultAsync(r => r.Id == id);
-            if (doc == null) return NotFound();
+                .FirstOrDefaultAsync(r => r.Id == id && r.Community.UserId == userId.Value);
+
+            if (doc == null)
+                return NotFound();
+
             return Ok(MapToDto(doc));
         }
 
         [HttpPost]
         public async Task<ActionResult<RegulationDocumentDto>> Create([FromBody] CreateRegulationRequest request)
         {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+                return Unauthorized("Пользователь не определен.");
+
+            var communityExists = await _context.Communities
+                .AnyAsync(c => c.Id == request.CommunityId && c.UserId == userId.Value);
+
+            if (!communityExists)
+                return BadRequest("Сообщество не найдено или недоступно текущему пользователю.");
+
             var doc = new RegulationDocument
             {
                 Id = Guid.NewGuid(),
@@ -55,7 +83,6 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 CommunityId = request.CommunityId
             };
 
-            // Разбиваем на чанки и получаем эмбеддинги
             var chunks = SplitTextIntoChunks(request.Content);
             foreach (var (chunkText, index) in chunks)
             {
@@ -66,33 +93,47 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                     RegulationId = doc.Id,
                     ChunkText = chunkText,
                     ChunkIndex = index,
-                    Embedding = new Vector(embedding),
+                    Embedding = new Pgvector.Vector(embedding),
                     CreatedAt = DateTime.UtcNow
                 };
+
                 doc.Chunks.Add(chunk);
             }
 
             _context.RegulationDocuments.Add(doc);
             await _context.SaveChangesAsync();
+
             return CreatedAtAction(nameof(GetById), new { id = doc.Id }, MapToDto(doc));
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] UpdateRegulationRequest request)
         {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+                return Unauthorized("Пользователь не определен.");
+
+            var communityExists = await _context.Communities
+                .AnyAsync(c => c.Id == request.CommunityId && c.UserId == userId.Value);
+
+            if (!communityExists)
+                return BadRequest("Сообщество не найдено или недоступно текущему пользователю.");
+
             var doc = await _context.RegulationDocuments
+                .Include(r => r.Community)
                 .Include(r => r.Chunks)
-                .FirstOrDefaultAsync(r => r.Id == id);
-            if (doc == null) return NotFound();
+                .FirstOrDefaultAsync(r => r.Id == id && r.Community.UserId == userId.Value);
+
+            if (doc == null)
+                return NotFound();
 
             doc.Title = request.Title;
             doc.Content = request.Content;
             doc.Category = request.Category;
+            doc.CommunityId = request.CommunityId;
 
-            // Удаляем старые чанки
             _context.RegulationChunks.RemoveRange(doc.Chunks);
 
-            // Создаём новые чанки
             var chunks = SplitTextIntoChunks(request.Content);
             foreach (var (chunkText, index) in chunks)
             {
@@ -103,9 +144,10 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                     RegulationId = doc.Id,
                     ChunkText = chunkText,
                     ChunkIndex = index,
-                    Embedding = new Vector(embedding),
+                    Embedding = new Pgvector.Vector(embedding),
                     CreatedAt = DateTime.UtcNow
                 };
+
                 _context.RegulationChunks.Add(chunk);
             }
 
@@ -116,10 +158,20 @@ namespace SmmAnalyzerPrototype.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            var doc = await _context.RegulationDocuments.FindAsync(id);
-            if (doc == null) return NotFound();
+            var userId = GetCurrentUserId();
+            if (userId == null)
+                return Unauthorized("Пользователь не определен.");
+
+            var doc = await _context.RegulationDocuments
+                .Include(r => r.Community)
+                .FirstOrDefaultAsync(r => r.Id == id && r.Community.UserId == userId.Value);
+
+            if (doc == null)
+                return NotFound();
+
             _context.RegulationDocuments.Remove(doc);
             await _context.SaveChangesAsync();
+
             return NoContent();
         }
 
@@ -213,6 +265,22 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 }).ToList();
             }
             return dto;
+        }
+
+        private Guid? GetCurrentUserId()
+        {
+            if (!Request.Headers.TryGetValue("X-User-Id", out var values))
+                return null;
+
+            var rawUserId = values.FirstOrDefault();
+
+            if (string.IsNullOrWhiteSpace(rawUserId))
+                return null;
+
+            if (!Guid.TryParse(rawUserId, out var userId))
+                return null;
+
+            return userId;
         }
     }
 }

@@ -9,6 +9,8 @@ namespace SmmAnalyzerPrototype.Data.Models
         [Key]
         public Guid Id { get; set; } = Guid.NewGuid();
 
+        public Guid UserId { get; set; }
+
         [Required]
         [MaxLength(255)]
         public string Name { get; set; } = string.Empty;
@@ -18,6 +20,19 @@ namespace SmmAnalyzerPrototype.Data.Models
 
         [MaxLength(255)]
         public string? StyleProfile { get; set; }
+
+        public string? VkInput { get; set; }
+
+        public long? VkGroupId { get; set; }
+
+        public string? VkScreenName { get; set; }
+
+        public string? VkUrl { get; set; }
+
+        public DateTime? VkPostsSyncedAt { get; set; }
+
+        [ForeignKey(nameof(UserId))]
+        public virtual User User { get; set; } = null!;
 
         public virtual ICollection<Post> Posts { get; set; } = new List<Post>();
         public virtual ICollection<CommunityPost> CommunityPosts { get; set; } = new List<CommunityPost>();

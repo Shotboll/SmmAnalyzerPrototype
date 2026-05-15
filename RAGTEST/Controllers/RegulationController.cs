@@ -1,10 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using SmmAnalyzerPrototype.Data.Models.DTO.Community;
 using SmmAnalyzerPrototype.Data.Models.DTO.Regualtion;
 
 namespace RAGTEST.Controllers
 {
+    [Authorize]
     public class RegulationController : Controller
     {
         private readonly IHttpClientFactory _httpClientFactory;
@@ -14,10 +16,21 @@ namespace RAGTEST.Controllers
             _httpClientFactory = httpClientFactory;
         }
 
+        private HttpClient CreateApiClient()
+        {
+            var client = _httpClientFactory.CreateClient("Api");
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+            if (!string.IsNullOrWhiteSpace(userId))
+                client.DefaultRequestHeaders.Add("X-User-Id", userId);
+
+            return client;
+        }
+
         // GET: /Regulation
         public async Task<IActionResult> Index(Guid? communityId)
         {
-            var client = _httpClientFactory.CreateClient("Api");
+            var client = CreateApiClient();
             string url = communityId.HasValue
                 ? $"api/regulationapi/GetAll?communityId={communityId}"
                 : "api/regulationapi/GetAll";
@@ -33,7 +46,7 @@ namespace RAGTEST.Controllers
         // GET: /Regulation/Create
         public async Task<IActionResult> Create()
         {
-            var client = _httpClientFactory.CreateClient("Api");
+            var client = CreateApiClient();
             var communitiesResponse = await client.GetAsync("api/communityapi/GetAll");
             var communities = await communitiesResponse.Content.ReadFromJsonAsync<List<CommunityDto>>();
             ViewBag.Communities = communities.Select(c => new SelectListItem
@@ -52,7 +65,7 @@ namespace RAGTEST.Controllers
         {
             if (!ModelState.IsValid) return await ReloadCreateView(request);
 
-            var client = _httpClientFactory.CreateClient("Api");
+            var client = CreateApiClient();
             var response = await client.PostAsJsonAsync("api/regulationapi/Create", request);
             if (response.IsSuccessStatusCode)
                 return RedirectToAction(nameof(Index));
@@ -63,7 +76,7 @@ namespace RAGTEST.Controllers
 
         private async Task<IActionResult> ReloadCreateView(CreateRegulationRequest request)
         {
-            var client = _httpClientFactory.CreateClient("Api");
+            var client = CreateApiClient();
             var communitiesResponse = await client.GetAsync("api/communityapi/GetAll");
             var communities = await communitiesResponse.Content.ReadFromJsonAsync<List<CommunityDto>>();
             ViewBag.Communities = communities.Select(c => new Microsoft.AspNetCore.Mvc.Rendering.SelectListItem
@@ -77,7 +90,7 @@ namespace RAGTEST.Controllers
         // GET: /Regulation/Edit/{id}
         public async Task<IActionResult> Edit(Guid id)
         {
-            var client = _httpClientFactory.CreateClient("Api");
+            var client = CreateApiClient();
             var response = await client.GetAsync($"api/regulationapi/GetById/{id}");
             if (!response.IsSuccessStatusCode) return NotFound();
 
@@ -117,7 +130,7 @@ namespace RAGTEST.Controllers
                 return await ReloadEditView(request, id);
             }
 
-            var client = _httpClientFactory.CreateClient("Api");
+            var client = CreateApiClient();
             var response = await client.PutAsJsonAsync($"api/regulationapi/Update/{id}", request);
             if (response.IsSuccessStatusCode)
                 return RedirectToAction(nameof(Index));
@@ -129,7 +142,7 @@ namespace RAGTEST.Controllers
 
         private async Task<IActionResult> ReloadEditView(UpdateRegulationRequest request, Guid id)
         {
-            var client = _httpClientFactory.CreateClient("Api");
+            var client = CreateApiClient();
             var communitiesResponse = await client.GetAsync("api/communityapi/GetAll");
             var communities = await communitiesResponse.Content.ReadFromJsonAsync<List<CommunityDto>>();
             ViewBag.Communities = communities.Select(c => new SelectListItem
@@ -145,7 +158,7 @@ namespace RAGTEST.Controllers
         // GET: /Regulation/Delete/{id}
         public async Task<IActionResult> Delete(Guid id)
         {
-            var client = _httpClientFactory.CreateClient("Api");
+            var client = CreateApiClient();
             var response = await client.GetAsync($"api/regulationapi/GetById/{id}");
             if (!response.IsSuccessStatusCode) return NotFound();
 
@@ -158,7 +171,7 @@ namespace RAGTEST.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(Guid id)
         {
-            var client = _httpClientFactory.CreateClient("Api");
+            var client = CreateApiClient();
             await client.DeleteAsync($"api/regulationapi/Delete/{id}");
             return RedirectToAction(nameof(Index));
         }

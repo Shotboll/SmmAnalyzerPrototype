@@ -121,13 +121,13 @@ namespace SmmAnalyzerPrototype.Api.Services
 
             var chunks = await _context.RegulationChunks
                 .FromSqlRaw(@"
-            SELECT c.*
-            FROM regulation_chunks c
-            INNER JOIN regulation_documents d ON c.""RegulationId"" = d.""Id""
-            WHERE d.""CommunityId"" = {0}
-            ORDER BY c.embedding <=> {1}::vector
-            LIMIT {2}
-        ", communityId, normalizedQuery, topK)
+                    SELECT c.*
+                    FROM regulation_chunks c
+                    INNER JOIN regulation_documents d ON c.""RegulationId"" = d.""Id""
+                    WHERE d.""CommunityId"" = {0}
+                    ORDER BY c.embedding <=> {1}::vector
+                    LIMIT {2}
+                ", communityId, normalizedQuery, topK)
                 .Include(x => x.Regulation)
                 .ToListAsync();
 
@@ -163,148 +163,9 @@ namespace SmmAnalyzerPrototype.Api.Services
 
             string response = await CallLlmAsync(prompt, LlmMode.RAG, GetRegulationCheckSchema());
 
-            response = ExtractJson(response);
+            response = LlmJsonExtractor.ExtractJson(response);
 
             return response;
-        }
-
-        private static string ExtractJson(string response)
-        {
-            if (string.IsNullOrWhiteSpace(response))
-                return "[]";
-
-            response = response.Trim();
-
-            // 1. Сначала пробуем извлечь JSON из markdown-блока ```json ... ```
-            var fencedJson = ExtractFromCodeFence(response, "json");
-            if (!string.IsNullOrWhiteSpace(fencedJson))
-                return fencedJson;
-
-            // 2. Потом пробуем извлечь из обычного блока ``` ... ```
-            var fencedCode = ExtractFromCodeFence(response, null);
-            if (!string.IsNullOrWhiteSpace(fencedCode) && LooksLikeJson(fencedCode))
-                return fencedCode;
-
-            // 3. Если модель добавила пояснения вроде "Формат ответа:"
-            //    ищем первый полноценный JSON-объект или массив в тексте
-            var embeddedJson = ExtractFirstJsonObjectOrArray(response);
-            if (!string.IsNullOrWhiteSpace(embeddedJson))
-                return embeddedJson;
-
-            // 4. Если вдруг весь ответ уже похож на JSON
-            if (LooksLikeJson(response))
-                return response;
-
-            // 5. Безопасный fallback
-            return "[]";
-        }
-
-        private static string? ExtractFromCodeFence(string text, string? language)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-                return null;
-
-            string openingFence = language == null ? "```" : $"```{language}";
-            int start = text.IndexOf(openingFence, StringComparison.OrdinalIgnoreCase);
-            if (start < 0)
-                return null;
-
-            start += openingFence.Length;
-
-            // пропускаем возможный перевод строки после ```json
-            while (start < text.Length && (text[start] == '\r' || text[start] == '\n'))
-                start++;
-
-            int end = text.IndexOf("```", start, StringComparison.OrdinalIgnoreCase);
-            if (end <= start)
-                return null;
-
-            var content = text.Substring(start, end - start).Trim();
-            return content;
-        }
-
-        private static bool LooksLikeJson(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-                return false;
-
-            text = text.Trim();
-            return (text.StartsWith("{") && text.EndsWith("}")) ||
-                   (text.StartsWith("[") && text.EndsWith("]"));
-        }
-
-        private static string? ExtractFirstJsonObjectOrArray(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-                return null;
-
-            int objectStart = text.IndexOf('{');
-            int arrayStart = text.IndexOf('[');
-
-            int start;
-            char openChar;
-            char closeChar;
-
-            if (objectStart == -1 && arrayStart == -1)
-                return null;
-
-            if (objectStart == -1 || (arrayStart != -1 && arrayStart < objectStart))
-            {
-                start = arrayStart;
-                openChar = '[';
-                closeChar = ']';
-            }
-            else
-            {
-                start = objectStart;
-                openChar = '{';
-                closeChar = '}';
-            }
-
-            var sb = new StringBuilder();
-            int depth = 0;
-            bool inString = false;
-            bool escape = false;
-
-            for (int i = start; i < text.Length; i++)
-            {
-                char c = text[i];
-                sb.Append(c);
-
-                if (escape)
-                {
-                    escape = false;
-                    continue;
-                }
-
-                if (c == '\\' && inString)
-                {
-                    escape = true;
-                    continue;
-                }
-
-                if (c == '"')
-                {
-                    inString = !inString;
-                    continue;
-                }
-
-                if (inString)
-                    continue;
-
-                if (c == openChar)
-                {
-                    depth++;
-                }
-                else if (c == closeChar)
-                {
-                    depth--;
-                    if (depth == 0)
-                        return sb.ToString().Trim();
-                }
-            }
-
-            return null;
         }
 
         public async Task<ExplainGrammarItemResponse> ExplainSingleGrammarErrorAsync(ExplainGrammarItemRequest request)
@@ -455,7 +316,7 @@ namespace SmmAnalyzerPrototype.Api.Services
                 """;
 
             var rawResponse = await CallLlmAsync(prompt, LlmMode.Strict, GetGrammarExplanationSchema());
-            rawResponse = ExtractJsonGrammar(rawResponse);
+            rawResponse = LlmJsonExtractor.ExtractJsonGrammar(rawResponse);
 
             try
             {
@@ -473,32 +334,6 @@ namespace SmmAnalyzerPrototype.Api.Services
                         : "Проверьте предложенное исправление."
                 }).ToList();
             }
-        }
-
-        private static string ExtractJsonGrammar(string response)
-        {
-            if (string.IsNullOrWhiteSpace(response))
-                return "[]";
-
-            var jsonBlockStart = response.IndexOf("```json", StringComparison.OrdinalIgnoreCase);
-            if (jsonBlockStart >= 0)
-            {
-                jsonBlockStart += 7;
-                var jsonBlockEnd = response.IndexOf("```", jsonBlockStart, StringComparison.OrdinalIgnoreCase);
-                if (jsonBlockEnd > jsonBlockStart)
-                    return response.Substring(jsonBlockStart, jsonBlockEnd - jsonBlockStart).Trim();
-            }
-
-            var codeBlockStart = response.IndexOf("```", StringComparison.OrdinalIgnoreCase);
-            if (codeBlockStart >= 0)
-            {
-                codeBlockStart += 3;
-                var codeBlockEnd = response.IndexOf("```", codeBlockStart, StringComparison.OrdinalIgnoreCase);
-                if (codeBlockEnd > codeBlockStart)
-                    return response.Substring(codeBlockStart, codeBlockEnd - codeBlockStart).Trim();
-            }
-
-            return response.Trim();
         }
 
         public async Task<StyleCheckResultDto> StyleCheck(string audience, string style, string text)
@@ -544,7 +379,7 @@ namespace SmmAnalyzerPrototype.Api.Services
 
             var rawResponse = await CallLlmAsync(prompt, LlmMode.Strict);
 
-            var json = ExtractJson(rawResponse);
+            var json = LlmJsonExtractor.ExtractJson(rawResponse);
 
             var options = new JsonSerializerOptions
             {
@@ -693,73 +528,72 @@ namespace SmmAnalyzerPrototype.Api.Services
 
         /// <summary>
         /// Расширенный прогноз вовлеченности на основе истории сообщества.
-        /// Соответствует функции 8 (п. 1.3.2 ВКР) и алгоритму 2.3.3 (Рис. 5).
         /// </summary>
-        public async Task<EngagementForecastDto> ForecastEngagementAsync(
-            Guid communityId,
-            string newPostText,
-            int historyDays = 30,
-            CancellationToken ct = default)
+        public async Task<EngagementForecastDto> ForecastEngagementAsync(Guid communityId, string newPostText, int historyDays = 30, CancellationToken ct = default)
         {
             var (metrics, topPosts, community) = await LoadContextAsync(communityId, newPostText, historyDays, ct);
 
+            var topPostsText = topPosts.Count > 0
+                ? string.Join("\n", topPosts.Select((p, i) => $"{i + 1}. «{p.ShortText}» (лайки {p.Likes}, комментарии {p.Comments})"))
+                : "Недостаточно исторических публикаций для выделения топ-постов.";
+
             var prompt = $$"""
-                    Ты — аналитик социальных сетей. Оцени потенциальную вовлеченность поста ДЛЯ КОНКРЕТНОГО СООБЩЕСТВА.
+                Ты — аналитик социальных сетей. Оцени потенциальную вовлеченность поста ДЛЯ КОНКРЕТНОГО СООБЩЕСТВА.
 
-                    ПРОФИЛЬ СООБЩЕСТВА:
-                    • Целевая аудитория: {{community.TargetAudience}}
-                    • Стиль общения: {{community.StyleProfile}}
-                    • Средние метрики (30 дней): лайки {{metrics.AvgLikes}}, комментарии {{metrics.AvgComments}}, просмотры {{metrics.AvgViews}}, ER {{metrics.AvgER}}%
-                    • Топ-3 поста по вовлеченности:
-                    {{string.Join("\n", topPosts.Select((p, i) => $"{i + 1}. «{p.ShortText}» (лайки {p.Likes}, комментарии {p.Comments})"))}}
+                ПРОФИЛЬ СООБЩЕСТВА:
+                • Название: {{community.Name}}
+                • Целевая аудитория: {{community.TargetAudience}}
+                • Стиль общения: {{community.StyleProfile}}
 
-                    НОВЫЙ ТЕКСТ:
-                    {{newPostText}}
+                ИСТОРИЯ ПУБЛИКАЦИЙ:
+                • Количество учтенных постов: {{metrics.TotalPosts}}
+                • Средние метрики: лайки {{metrics.AvgLikes}}, комментарии {{metrics.AvgComments}}, просмотры {{metrics.AvgViews}}, ER {{metrics.AvgER}}%
+                • Топ-3 поста по вовлеченности:
+                {{topPostsText}}
 
-                    ❗ КРИТЕРИИ ОЦЕНКИ (оценивай ОТНОСИТЕЛЬНО профиля сообщества, а не абсолютно):
+                НОВЫЙ ТЕКСТ:
+                {{newPostText}}
 
-                    СНИЖАЮТ оценку (–15…–40 баллов), если есть ЛЮБОЙ из признаков:
-                    - Контент не соответствует тематике/интересам указанной ЦА
-                    - Тон/стиль текста противоречит заявленному стилю общения сообщества
-                    - Отсутствие ясной цели или призыва к действию, релевантного данной аудитории
-                    - Избыточная сложность или, наоборот, примитивность для данной ЦА
-                    - Контент, который может вызвать отторжение у данной аудитории (определи по контексту)
+                ЗАДАЧА:
+                Оцени, насколько новый текст может быть успешен именно для этого сообщества.
+                Оцени не абстрактно, а относительно целевой аудитории, стиля общения и истории публикаций.
 
-                    ПОВЫШАЮТ оценку (+15…+40 баллов), если есть:
-                    - Явное соответствие теме/интересам ЦА и стилю сообщества
-                    - Конкретные факты, цифры, доказательства, релевантные для данной аудитории
-                    - Четкий призыв к действию, уместный для этого сообщества
-                    - Хорошая структура: заголовок, логика, визуальные акценты (если уместно по стилю)
-                    - Эмоциональная подача, соответствующая ожидаемому тону сообщества
+                КРИТЕРИИ ОЦЕНКИ:
+                1. Соответствие теме и интересам целевой аудитории.
+                2. Соответствие стилю общения сообщества.
+                3. Наличие понятной ценности для аудитории.
+                4. Наличие структуры, конкретики и призыва к действию.
+                5. Потенциальная способность вызвать реакцию: лайк, комментарий, репост.
 
-                    ПРАВИЛА:
-                    1. Не оценивай текст «вообще». Оценивай: «Насколько этот текст подойдет именно ЭТОЙ аудитории в ЭТОМ стиле?»
-                    2. Сравни пост с топ-3. Если по теме/стилю/подаче близок к лидеру → 75–95. Если выбивается из контекста → <40.
-                    3. «Политика», «коммерция», «юмор» — не являются автоматически «плохими» или «хорошими». Оценивай их уместность для данного сообщества.
-                    4. Если в тексте есть явные ошибки, токсичность или спам — снижай оценку независимо от тематики.
+                ШКАЛА qualityScore:
+                0–20  — критически низкое соответствие;
+                21–40 — низкий потенциал;
+                41–60 — средний потенциал;
+                61–80 — высокий потенциал;
+                81–100 — очень высокий потенциал.
 
-                    ШКАЛА (используй ВЕСЬ диапазон 0–100):
-                    0–20  | Критическое несоответствие: контент чужероден для ЦА/стиля, есть ошибки/спам
-                    21–40 | Низкий: текст уместен, но нет ценности, структуры или призыва для этой ЦА
-                    41–60 | Средний: стандартный пост, соответствует профилю, но без «крючка»
-                    61–80 | Высокий: хорошая структура, ценность, элементы вовлечения, соответствует стилю
-                    81–100| Отличный: идеально под ЦА + структура + факты/эмоции + четкий уместный призыв
+                ВАЖНО:
+                - Не завышай оценку без причины.
+                - Если исторических данных мало, укажи это в reasoning и confidence.
+                - expectedLikes, expectedComments и expectedViews должны быть реалистично связаны со средними метриками.
+                - Если текст хуже среднего, прогноз должен быть ниже средних метрик.
+                - Если текст лучше среднего, прогноз может быть выше средних метрик.
 
-                    ВЕРНИ СТРОГО JSON:
-                    {
-                      "level": "string", // ОЧЕНЬ НИЗКИЙ / НИЗКИЙ / СРЕДНИЙ / ВЫСОКИЙ / ОЧЕНЬ ВЫСОКИЙ
-                      "quality_score": int, // 0–100, используй весь диапазон
-                      "expected_likes": int,
-                      "expected_comments": int,
-                      "expected_views": int,
-                      "expected_er_percent": double,
-                      "confidence": double,
-                      "reasoning": "string", // Объясни, почему оценка такая, ссылаясь на ЦА и стиль
-                      "key_factors": ["string"], // 2-3 фактора, влияющих на прогноз
-                      "risks": ["string"], // 1-2 риска для вовлеченности
-                      "comparison_with_avg": "string" // Вид: "+15% к лайкам" или "ниже среднего из-за..."
-                    }
-                    """;
+                Верни СТРОГО JSON без markdown:
+                {
+                  "level": "ОЧЕНЬ НИЗКИЙ / НИЗКИЙ / СРЕДНИЙ / ВЫСОКИЙ / ОЧЕНЬ ВЫСОКИЙ",
+                  "quality_score": 0,
+                  "expected_likes": 0,
+                  "expected_comments": 0,
+                  "expected_views": 0,
+                  "expected_er_percent": 0.0,
+                  "confidence": 0.0,
+                  "reasoning": "Краткое объяснение прогноза",
+                  "key_factors": ["Фактор 1", "Фактор 2"],
+                  "risks": ["Риск 1"],
+                  "comparison_with_avg": "Сравнение со средними метриками сообщества"
+                }
+                """;
 
             var schema = new
             {
@@ -767,8 +601,8 @@ namespace SmmAnalyzerPrototype.Api.Services
                 properties = new
                 {
                     level = new { type = "string" },
-                    expected_likes = new { type = "integer" },
                     quality_score = new { type = "integer" },
+                    expected_likes = new { type = "integer" },
                     expected_comments = new { type = "integer" },
                     expected_views = new { type = "integer" },
                     expected_er_percent = new { type = "number" },
@@ -786,54 +620,65 @@ namespace SmmAnalyzerPrototype.Api.Services
 
         /// <summary>
         /// Генерация рекомендаций по улучшению текста и подбору тем.
-        /// Соответствует функции 9 (п. 1.3.2 ВКР) и алгоритму 2.3.3 (Рис. 5).
         /// </summary>
-        public async Task<ContentRecommendationsDto> GenerateRecommendationsAsync(
-            Guid communityId,
-            string newPostText,
-            int historyDays = 30,
-            CancellationToken ct = default)
+        public async Task<ContentRecommendationsDto> GenerateRecommendationsAsync(Guid communityId, string newPostText, int historyDays = 30, CancellationToken ct = default)
         {
             var (metrics, topPosts, community) = await LoadContextAsync(communityId, newPostText, historyDays, ct);
 
+            var topPostsText = topPosts.Count > 0
+                ? string.Join("\n", topPosts.Take(3).Select((p, i) => $"{i + 1}. «{p.ShortText}»"))
+                : "Недостаточно исторических публикаций для выделения успешных тем.";
+
             var prompt = $$"""
-                    Ты — SMM-стратег и редактор. Дай практические рекомендации по улучшению поста.
+                Ты — SMM-стратег и редактор. Дай практические рекомендации по улучшению поста для конкретного сообщества.
 
-                    КОНТЕКСТ:
-                    • ЦА: {{community?.TargetAudience ?? "не указана"}}
-                    • Стиль: {{community?.StyleProfile ?? "не указан"}}
-                    • Средние метрики: лайки {{metrics.AvgLikes:F0}}, комментарии {{metrics.AvgComments:F0}}, просмотры {{metrics.AvgViews:F0}}
-                    • Что обычно работает: {{string.Join(", ", topPosts.Take(2).Select(p => $"«{p.ShortText}»"))}}
+                ПРОФИЛЬ СООБЩЕСТВА:
+                • Название: {{community.Name}}
+                • Целевая аудитория: {{community.TargetAudience}}
+                • Стиль общения: {{community.StyleProfile}}
 
-                    ТЕКСТ ДЛЯ УЛУЧШЕНИЯ:
-                    {{newPostText}}
+                ИСТОРИЯ ПУБЛИКАЦИЙ:
+                • Количество учтенных постов: {{metrics.TotalPosts}}
+                • Средние метрики: лайки {{metrics.AvgLikes}}, комментарии {{metrics.AvgComments}}, просмотры {{metrics.AvgViews}}, ER {{metrics.AvgER}}%
+                • Что обычно работает:
+                {{topPostsText}}
 
-                    ЗАДАЧА:
-                    1. Конкретные правки текста (лексика, тон, ясность).
-                    2. Структурные изменения (заголовок, абзацы, CTA).
-                    3. 2-3 смежные темы, которые могут сработать.
-                    4. Приёмы повышения вовлеченности (опрос, вопрос, медиа, хештеги).
-                    5. Общий совет по публикации.
+                ТЕКСТ ДЛЯ УЛУЧШЕНИЯ:
+                {{newPostText}}
 
-                    Верни СТРОГО JSON:
-                    {
-                        "text_improvements": ["string"],
-                        "structural_changes": ["string"],
-                        "topic_ideas": ["string"],
-                        "engagement_boosters": ["string"],
-                        "overall_advice": "string"
-                    }
-                    """;
+                ЗАДАЧА:
+                1. Дай конкретные правки текста.
+                2. Предложи структурные изменения.
+                3. Предложи 2-3 смежные темы для будущих публикаций.
+                4. Предложи приемы повышения вовлеченности.
+                5. Дай общий совет по публикации.
+
+                ВАЖНО:
+                - Не давай слишком общие советы вроде "сделайте текст интереснее".
+                - Каждая рекомендация должна быть применима к данному тексту.
+                - Учитывай целевую аудиторию и стиль сообщества.
+                - Не переписывай весь пост полностью.
+                - Не добавляй ничего вне JSON.
+
+                Верни СТРОГО JSON без markdown:
+                {
+                  "textImprovements": ["Конкретная правка текста 1", "Конкретная правка текста 2", "Конкретная правка текста 3"],
+                  "structuralChanges": ["Структурное изменение 1", "Структурное изменение 2"],
+                  "topicIdeas": ["Тема 1", "Тема 2", "Тема 3"],
+                  "engagementBoosters": ["Прием вовлеченности 1", "Прием вовлеченности 2"],
+                  "overallAdvice": "Общий совет по публикации"
+                }
+                """;
 
             var schema = new
             {
                 type = "object",
                 properties = new
                 {
-                    textImprovements = new { type = "array", items = new { type = "string" }, minItems = 3 },
-                    structuralChanges = new { type = "array", items = new { type = "string" }, minItems = 2 },
-                    topicIdeas = new { type = "array", items = new { type = "string" }, minItems = 2 },
-                    engagementBoosters = new { type = "array", items = new { type = "string" }, minItems = 2 },
+                    textImprovements = new { type = "array", items = new { type = "string" } },
+                    structuralChanges = new { type = "array", items = new { type = "string" } },
+                    topicIdeas = new { type = "array", items = new { type = "string" } },
+                    engagementBoosters = new { type = "array", items = new { type = "string" } },
                     overallAdvice = new { type = "string" }
                 },
                 required = new[] { "textImprovements", "structuralChanges", "topicIdeas", "engagementBoosters", "overallAdvice" }
@@ -842,24 +687,47 @@ namespace SmmAnalyzerPrototype.Api.Services
             return await ParseLlmResponseAsync<ContentRecommendationsDto>(prompt, schema, ct);
         }
 
-        private async Task<(CommunityMetricsDto Metrics, List<SamplePostDto> TopPosts, Community? Community)>LoadContextAsync(Guid communityId, string text, int historyDays, CancellationToken ct)
+        private async Task<(CommunityMetricsDto Metrics, List<SamplePostDto> TopPosts, Community Community)> LoadContextAsync(Guid communityId, string text, int historyDays, CancellationToken ct)
         {
+            var community = await _context.Communities.FirstOrDefaultAsync(c => c.Id == communityId, ct);
+
+            if (community == null)
+                throw new InvalidOperationException("Сообщество не найдено.");
+
             var cutoff = DateTime.UtcNow.AddDays(-historyDays);
+
             var posts = await _context.CommunityPosts
-                .Where(p => p.CommunityId == communityId && p.PublishedAt >= cutoff)
+                .Where(p => p.CommunityId == communityId)
+                .Where(p => p.Source == "vk")
+                .Where(p => p.PublishedAt >= cutoff)
                 .OrderByDescending(p => p.PublishedAt)
                 .ToListAsync(ct);
 
+            if (posts.Count < 10)
+            {
+                posts = await _context.CommunityPosts
+                    .Where(p => p.CommunityId == communityId)
+                    .Where(p => p.Source == "vk")
+                    .OrderByDescending(p => p.PublishedAt)
+                    .Take(50)
+                    .ToListAsync(ct);
+            }
+
             var total = posts.Count;
+
             var avgLikes = total > 0 ? posts.Average(p => p.Likes) : 0;
             var avgComments = total > 0 ? posts.Average(p => p.Comments) : 0;
+            var avgReposts = total > 0 ? posts.Average(p => p.Reposts) : 0;
             var avgViews = total > 0 ? posts.Average(p => p.Views) : 0;
-            var avgER = avgViews > 0 ? (avgLikes + avgComments * 2) / avgViews * 100 : 0;
+
+            var avgER = avgViews > 0
+                ? (avgLikes + avgComments + avgReposts) / avgViews * 100
+                : 0;
 
             var metrics = new CommunityMetricsDto
             {
                 TotalPosts = total,
-                PostsPerWeek = total / (historyDays / 7.0),
+                PostsPerWeek = historyDays > 0 ? Math.Round(total / (historyDays / 7.0), 2) : 0,
                 AvgLikes = Math.Round(avgLikes, 1),
                 AvgComments = Math.Round(avgComments, 1),
                 AvgViews = Math.Round(avgViews, 0),
@@ -867,78 +735,93 @@ namespace SmmAnalyzerPrototype.Api.Services
             };
 
             var topPosts = posts
-                .OrderByDescending(p => p.Likes + p.Comments * 2)
+                .OrderByDescending(p => p.Views > 0 ? ((p.Likes + p.Comments + p.Reposts) / (double)p.Views) : (p.Likes + p.Comments * 2 + p.Reposts * 3))
                 .Take(3)
                 .Select(p => new SamplePostDto
                 {
-                    ShortText = p.Text,
+                    ShortText = TruncateText(p.Text, 280),
                     Likes = p.Likes,
                     Comments = p.Comments
                 })
                 .ToList();
 
-            var community = await _context.Communities.FindAsync(communityId, ct);
             return (metrics, topPosts, community);
+        }
+
+        private static string TruncateText(string? text, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return string.Empty;
+
+            text = text.Trim();
+
+            if (text.Length <= maxLength)
+                return text;
+
+            return text.Substring(0, maxLength).Trim() + "...";
         }
 
         private async Task<T> ParseLlmResponseAsync<T>(string prompt, object schema, CancellationToken ct)
         {
-            // 1. Получаем сырой ответ от Ollama
+            ct.ThrowIfCancellationRequested();
+
             var raw = await CallLlmAsync(prompt, LlmMode.Forecast, schema);
 
-            // 2. CallLlmAsync уже извлек поле "response" из wrapper-ответа Ollama
-            //    Но если там остался внешний JSON-обёртка — извлекаем внутренний ответ
-             var json = raw.Trim();
+            ct.ThrowIfCancellationRequested();
 
-            // Если ответ начинается с { и содержит поле "response" — это wrapper Ollama
-            if (json.StartsWith("{") && json.Contains("\"response\""))
-            {
-                try
-                {
-                    using var doc = JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty("response", out var responseElement))
-                    {
-                        json = responseElement.GetString()?.Trim() ?? json;
-                    }
-                }
-                catch
-                {
-                    // Если не получилось распарсить — пробуем как есть
-                }
-            }
+            var json = LlmJsonExtractor.ExtractJson(raw);
 
-            // 3. Пробуем десериализовать
             try
             {
-                var result = System.Text.Json.JsonSerializer.Deserialize<T>(json, new System.Text.Json.JsonSerializerOptions
+                var result = JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
 
-                if (result != null) return result;
+                if (result != null)
+                    return result;
             }
             catch (Exception ex)
             {
-                // Логируем ошибку для отладки
-                Console.WriteLine($"❌ Ошибка десериализации: {ex.Message}");
-                Console.WriteLine($"📦 JSON: {json}");
+                Console.WriteLine($"Ошибка десериализации ответа модели: {ex.Message}");
+                Console.WriteLine($"JSON: {json}");
             }
 
-            // 4. Fallback: возвращаем пустой объект с предупреждением
-            var fallback = Activator.CreateInstance<T>()!;
-            var typeName = typeof(T).Name;
-
-            if (typeName.Contains("Forecast"))
+            if (typeof(T) == typeof(EngagementForecastDto))
             {
-                ((dynamic)fallback).Level = "ошибка парсинга";
-                ((dynamic)fallback).Reasoning = "Не удалось обработать ответ модели";
-            }
-            else if (typeName.Contains("Recommendation"))
-            {
-                ((dynamic)fallback).OverallAdvice = "Попробуйте переформулировать запрос";
+                var fallback = new EngagementForecastDto
+                {
+                    Level = "ошибка парсинга",
+                    QualityScore = 0,
+                    ExpectedLikes = 0,
+                    ExpectedComments = 0,
+                    ExpectedViews = 0,
+                    ExpectedERPercent = 0,
+                    Confidence = 0,
+                    Reasoning = "Не удалось корректно обработать ответ модели.",
+                    KeyFactors = new List<string>(),
+                    Risks = new List<string>(),
+                    ComparisonWithAvg = "Сравнение со средними метриками недоступно."
+                };
+
+                return (T)(object)fallback;
             }
 
-            return fallback;
+            if (typeof(T) == typeof(ContentRecommendationsDto))
+            {
+                var fallback = new ContentRecommendationsDto
+                {
+                    TextImprovements = new List<string>(),
+                    StructuralChanges = new List<string>(),
+                    TopicIdeas = new List<string>(),
+                    EngagementBoosters = new List<string>(),
+                    OverallAdvice = "Не удалось корректно обработать ответ модели. Попробуйте запустить генерацию повторно."
+                };
+
+                return (T)(object)fallback;
+            }
+
+            return Activator.CreateInstance<T>()!;
         }
     }
 }

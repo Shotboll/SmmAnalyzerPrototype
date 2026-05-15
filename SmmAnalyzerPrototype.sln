@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmmAnalyzerPrototype.Data",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmmAnalyzerPrototype.Api", "SmmAnalyzerPrototype.Api\SmmAnalyzerPrototype.Api.csproj", "{CF1EDCA3-F265-432D-B4B4-DC5CDE0A928B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmmAnalyzerPrototype.Tests", "SmmAnalyzerPrototype.Tests\SmmAnalyzerPrototype.Tests.csproj", "{B0EEF74E-853D-4F45-83B4-8FD804D65D17}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{CF1EDCA3-F265-432D-B4B4-DC5CDE0A928B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CF1EDCA3-F265-432D-B4B4-DC5CDE0A928B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CF1EDCA3-F265-432D-B4B4-DC5CDE0A928B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B0EEF74E-853D-4F45-83B4-8FD804D65D17}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B0EEF74E-853D-4F45-83B4-8FD804D65D17}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B0EEF74E-853D-4F45-83B4-8FD804D65D17}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B0EEF74E-853D-4F45-83B4-8FD804D65D17}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

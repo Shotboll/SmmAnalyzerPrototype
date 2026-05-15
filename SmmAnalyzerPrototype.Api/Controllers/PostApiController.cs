@@ -6,6 +6,7 @@ using SmmAnalyzerPrototype.Data.Data;
 using SmmAnalyzerPrototype.Data.Models;
 using SmmAnalyzerPrototype.Data.Models.DTO.Post;
 using System.Text.Json;
+using VkNet.Model;
 
 namespace SmmAnalyzerPrototype.Api.Controllers
 {
@@ -17,26 +18,31 @@ namespace SmmAnalyzerPrototype.Api.Controllers
         private readonly LlmService _llmService;
         private readonly LanguageToolService _languageToolService;
         private readonly GrammarFalsePositiveFilterService _grammarFilterService;
+        private readonly VkService _vkService;
+        private readonly ILogger<PostApiController> _logger;
 
-        public PostApiController(
-            AppDbContext context,
-            LlmService llmService,
-            LanguageToolService languageToolService,
-            GrammarFalsePositiveFilterService grammarFilterService)
+        public PostApiController(AppDbContext context, LlmService llmService, LanguageToolService languageToolService, GrammarFalsePositiveFilterService grammarFilterService, VkService vkService, ILogger<PostApiController> logger)
         {
             _context = context;
             _llmService = llmService;
             _languageToolService = languageToolService;
             _grammarFilterService = grammarFilterService;
+            _vkService = vkService;
+            _logger = logger;
         }
 
         [HttpGet]
         public async Task<ActionResult<List<PostListItemDto>>> GetAll()
         {
+
+            var userId = GetCurrentUserId();
+            if (userId == null)
+                return Unauthorized("Пользователь не определен.");
+
             var posts = await _context.Posts
                 .Include(p => p.Community)
-                .Include(p => p.Author)
                 .Include(p => p.AnalysisResult)
+                .Where(p => p.Community.UserId == userId.Value)
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
 
@@ -45,7 +51,6 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 Id = p.Id,
                 TextPreview = p.Text.Length > 140 ? p.Text.Substring(0, 140) + "..." : p.Text,
                 CommunityName = p.Community.Name,
-                AuthorLogin = p.Author.Login,
                 CreatedAt = p.CreatedAt,
                 Status = p.Status,
                 GrammarChecked = p.AnalysisResult?.GrammarCheckedAt != null,
@@ -61,14 +66,18 @@ namespace SmmAnalyzerPrototype.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<PostDetailsDto>> GetById(Guid id)
         {
+
+            var userId = GetCurrentUserId();
+            if (userId == null)
+                return Unauthorized("Пользователь не определен.");
+
             var post = await _context.Posts
                 .Include(p => p.Community)
-                .Include(p => p.Author)
                 .Include(p => p.AnalysisResult)
                     .ThenInclude(a => a.GrammarErrors)
                 .Include(p => p.AnalysisResult)
                     .ThenInclude(a => a.ProhibitedTopicMatches)
-                .FirstOrDefaultAsync(p => p.Id == id);
+                .FirstOrDefaultAsync(p => p.Id == id && p.Community.UserId == userId.Value);
 
             if (post == null)
                 return NotFound();
@@ -79,7 +88,6 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 Text = post.Text,
                 CommunityId = post.CommunityId,
                 CommunityName = post.Community.Name,
-                AuthorLogin = post.Author.Login,
                 CreatedAt = post.CreatedAt,
                 Status = post.Status,
                 GrammarCheckedAt = post.AnalysisResult?.GrammarCheckedAt,
@@ -190,19 +198,24 @@ namespace SmmAnalyzerPrototype.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<PostDetailsDto>> Create([FromBody] CreatePostRequest request)
         {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+                return Unauthorized("Пользователь не определен.");
+
             if (request == null || request.CommunityId == Guid.Empty || string.IsNullOrWhiteSpace(request.Text))
-                return BadRequest();
+                return BadRequest("Некорректные данные публикации.");
 
-            var firstUser = await _context.Users.FirstOrDefaultAsync();
-            if (firstUser == null)
-                return BadRequest("В системе нет пользователя.");
+            var community = await _context.Communities
+                .FirstOrDefaultAsync(c => c.Id == request.CommunityId && c.UserId == userId.Value);
 
-            var post = new Post
+            if (community == null)
+                return BadRequest("Сообщество не найдено или недоступно текущему пользователю.");
+
+            var post = new Data.Models.Post
             {
                 Id = Guid.NewGuid(),
                 Text = request.Text.Trim(),
-                CommunityId = request.CommunityId,
-                AuthorId = firstUser.Id,
+                CommunityId = community.Id,
                 CreatedAt = DateTime.UtcNow,
                 Status = "Draft"
             };
@@ -223,21 +236,35 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 Id = post.Id,
                 Text = post.Text,
                 CommunityId = post.CommunityId,
+                CommunityName = community.Name,
                 CreatedAt = post.CreatedAt,
-                Status = post.Status,
-                AuthorLogin = firstUser.Login
+                Status = post.Status
             });
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] UpdatePostRequest request)
         {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+                return Unauthorized("Пользователь не определен.");
+
+            if (request == null || request.CommunityId == Guid.Empty || string.IsNullOrWhiteSpace(request.Text))
+                return BadRequest("Некорректные данные публикации.");
+
+            var targetCommunityExists = await _context.Communities
+                .AnyAsync(c => c.Id == request.CommunityId && c.UserId == userId.Value);
+
+            if (!targetCommunityExists)
+                return BadRequest("Сообщество не найдено или недоступно текущему пользователю.");
+
             var post = await _context.Posts
+                .Include(p => p.Community)
                 .Include(p => p.AnalysisResult)
-                .FirstOrDefaultAsync(p => p.Id == id);
+                .FirstOrDefaultAsync(p => p.Id == id && p.Community.UserId == userId.Value);
 
             if (post == null)
-                return NotFound();
+                return NotFound("Пост не найден.");
 
             var textChanged = post.Text.Trim() != request.Text.Trim();
             var communityChanged = post.CommunityId != request.CommunityId;
@@ -266,6 +293,8 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                     post.AnalysisResult.GrammarCheckedAt = null;
                     post.AnalysisResult.StyleCheckedAt = null;
                     post.AnalysisResult.RegulationCheckedAt = null;
+                    post.AnalysisResult.ForecastCheckedAt = null;
+                    post.AnalysisResult.RecommendationsCheckedAt = null;
 
                     post.AnalysisResult.StyleAssessment = null;
                     post.AnalysisResult.StyleSummary = null;
@@ -275,6 +304,9 @@ namespace SmmAnalyzerPrototype.Api.Controllers
 
                     post.AnalysisResult.HasRegulationViolations = null;
                     post.AnalysisResult.RegulationComment = null;
+                    post.AnalysisResult.EngagementForecastJson = null;
+                    post.AnalysisResult.RecommendationsJson = null;
+
                     post.AnalysisResult.UpdatedAt = DateTime.UtcNow;
                 }
             }
@@ -557,19 +589,55 @@ namespace SmmAnalyzerPrototype.Api.Controllers
         [HttpPost("{postId}")]
         public async Task<ActionResult<EngagementForecastDto>> RunForecast(Guid postId)
         {
-            var post = await _context.Posts.Include(p => p.AnalysisResult).FirstOrDefaultAsync(p => p.Id == postId);
-            if (post == null) return NotFound();
+            var post = await _context.Posts
+                .Include(p => p.Community)
+                .Include(p => p.AnalysisResult)
+                .FirstOrDefaultAsync(p => p.Id == postId, HttpContext.RequestAborted);
+
+            if (post == null)
+                return NotFound("Пост не найден.");
+
+            if (post.Community == null)
+                return BadRequest("У поста не указано сообщество.");
+
+            if (string.IsNullOrWhiteSpace(post.Text))
+                return BadRequest("Текст поста не может быть пустым.");
+
+            try
+            {
+                await _vkService.EnsureCommunityPostsSyncedAsync(communityId: post.CommunityId, maxPages: 3, minExistingPosts: 30, refreshInterval: TimeSpan.FromHours(12), ct: HttpContext.RequestAborted);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Не удалось синхронизировать историю VK перед прогнозом. PostId={PostId}, CommunityId={CommunityId}", postId, post.CommunityId);
+
+                var existingPostsCount = await _context.CommunityPosts
+                    .CountAsync(x => x.CommunityId == post.CommunityId && x.Source == "vk", HttpContext.RequestAborted);
+
+                if (existingPostsCount == 0)
+                {
+                    return BadRequest("Не удалось загрузить историю публикаций VK. Проверьте ссылку на сообщество и доступность стены.");
+                }
+            }
 
             var forecast = await _llmService.ForecastEngagementAsync(post.CommunityId, post.Text, 30, HttpContext.RequestAborted);
 
-            var result = post.AnalysisResult ?? new AnalysisResult { PostId = postId };
+            var result = post.AnalysisResult ?? new AnalysisResult
+            {
+                PostId = postId,
+                UpdatedAt = DateTime.UtcNow
+            };
+
             result.EngagementForecastJson = JsonSerializer.Serialize(forecast);
             result.ForecastCheckedAt = DateTime.UtcNow;
             result.UpdatedAt = DateTime.UtcNow;
+
             post.Status = "Analyzed";
 
-            if (post.AnalysisResult == null) _context.AnalysisResults.Add(result);
-            await _context.SaveChangesAsync();
+            if (post.AnalysisResult == null)
+                _context.AnalysisResults.Add(result);
+
+            await _context.SaveChangesAsync(HttpContext.RequestAborted);
 
             return Ok(forecast);
         }
@@ -578,21 +646,73 @@ namespace SmmAnalyzerPrototype.Api.Controllers
         [HttpPost("{postId}")]
         public async Task<ActionResult<ContentRecommendationsDto>> RunRecommendations(Guid postId)
         {
-            var post = await _context.Posts.Include(p => p.AnalysisResult).FirstOrDefaultAsync(p => p.Id == postId);
-            if (post == null) return NotFound();
+            var post = await _context.Posts
+                .Include(p => p.Community)
+                .Include(p => p.AnalysisResult)
+                .FirstOrDefaultAsync(p => p.Id == postId, HttpContext.RequestAborted);
+
+            if (post == null)
+                return NotFound("Пост не найден.");
+
+            if (post.Community == null)
+                return BadRequest("У поста не указано сообщество.");
+
+            if (string.IsNullOrWhiteSpace(post.Text))
+                return BadRequest("Текст поста не может быть пустым.");
+
+            try
+            {
+                await _vkService.EnsureCommunityPostsSyncedAsync(communityId: post.CommunityId, maxPages: 3, minExistingPosts: 30, refreshInterval: TimeSpan.FromHours(12), ct: HttpContext.RequestAborted);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Не удалось синхронизировать историю VK перед рекомендациями. PostId={PostId}, CommunityId={CommunityId}", postId, post.CommunityId);
+
+                var existingPostsCount = await _context.CommunityPosts
+                    .CountAsync(x => x.CommunityId == post.CommunityId && x.Source == "vk", HttpContext.RequestAborted);
+
+                if (existingPostsCount == 0)
+                {
+                    return BadRequest("Не удалось загрузить историю публикаций VK. Проверьте ссылку на сообщество и доступность стены.");
+                }
+            }
 
             var recs = await _llmService.GenerateRecommendationsAsync(post.CommunityId, post.Text, 30, HttpContext.RequestAborted);
 
-            var result = post.AnalysisResult ?? new AnalysisResult { PostId = postId };
+            var result = post.AnalysisResult ?? new AnalysisResult
+            {
+                PostId = postId,
+                UpdatedAt = DateTime.UtcNow
+            };
+
             result.RecommendationsJson = JsonSerializer.Serialize(recs);
             result.RecommendationsCheckedAt = DateTime.UtcNow;
             result.UpdatedAt = DateTime.UtcNow;
+
             post.Status = "Analyzed";
 
-            if (post.AnalysisResult == null) _context.AnalysisResults.Add(result);
-            await _context.SaveChangesAsync();
+            if (post.AnalysisResult == null)
+                _context.AnalysisResults.Add(result);
+
+            await _context.SaveChangesAsync(HttpContext.RequestAborted);
 
             return Ok(recs);
+        }
+
+        private Guid? GetCurrentUserId()
+        {
+            if (!Request.Headers.TryGetValue("X-User-Id", out var values))
+                return null;
+
+            var rawUserId = values.FirstOrDefault();
+
+            if (string.IsNullOrWhiteSpace(rawUserId))
+                return null;
+
+            if (!Guid.TryParse(rawUserId, out var userId))
+                return null;
+
+            return userId;
         }
     }
 }

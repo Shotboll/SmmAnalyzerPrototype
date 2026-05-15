@@ -11,5 +11,6 @@ namespace SmmAnalyzerPrototype.Data.Models.DTO.Community
         public string Name { get; set; } = string.Empty;
         public string? TargetAudience { get; set; }
         public string? StyleProfile { get; set; }
+        public string? VkInput { get; set; }
     }
 }

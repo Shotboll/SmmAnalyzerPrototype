@@ -35,11 +35,19 @@ namespace SmmAnalyzerPrototype.Data.Data
                 .HasIndex(u => u.Login)
                 .IsUnique();
 
-            modelBuilder.Entity<Post>()
-                .HasOne(p => p.Author)
-                .WithMany()
-                .HasForeignKey(p => p.AuthorId)
-                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Email)
+                .IsUnique();
+
+            modelBuilder.Entity<User>()
+                .Property(u => u.Email)
+                .IsRequired(false);
+
+            modelBuilder.Entity<User>()
+                .HasMany(u => u.Communities)
+                .WithOne(c => c.User)
+                .HasForeignKey(c => c.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Post>()
                 .HasOne(p => p.Community)

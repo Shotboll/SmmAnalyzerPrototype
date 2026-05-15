@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pgvector;
@@ -12,9 +13,11 @@ using SmmAnalyzerPrototype.Data.Data;
 namespace SmmAnalyzerPrototype.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260513153508_AddVkFieldsToCommunity")]
+    partial class AddVkFieldsToCommunity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -115,9 +118,6 @@ namespace SmmAnalyzerPrototype.Data.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
                     b.Property<long?>("VkGroupId")
                         .HasColumnType("bigint");
 
@@ -134,8 +134,6 @@ namespace SmmAnalyzerPrototype.Data.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("communities");
                 });
@@ -233,6 +231,9 @@ namespace SmmAnalyzerPrototype.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("CommunityId")
                         .HasColumnType("uuid");
 
@@ -254,9 +255,16 @@ namespace SmmAnalyzerPrototype.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("AuthorId");
+
                     b.HasIndex("CommunityId");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("posts");
                 });
@@ -361,10 +369,6 @@ namespace SmmAnalyzerPrototype.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
                     b.Property<string>("Email")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
@@ -374,15 +378,12 @@ namespace SmmAnalyzerPrototype.Data.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
-                    b.Property<string>("PasswordHash")
+                    b.Property<string>("Password")
                         .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Email")
-                        .IsUnique();
 
                     b.HasIndex("Login")
                         .IsUnique();
@@ -399,17 +400,6 @@ namespace SmmAnalyzerPrototype.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Post");
-                });
-
-            modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.Community", b =>
-                {
-                    b.HasOne("SmmAnalyzerPrototype.Data.Models.User", "User")
-                        .WithMany("Communities")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.CommunityPost", b =>
@@ -436,11 +426,23 @@ namespace SmmAnalyzerPrototype.Data.Migrations
 
             modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.Post", b =>
                 {
+                    b.HasOne("SmmAnalyzerPrototype.Data.Models.User", "Author")
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("SmmAnalyzerPrototype.Data.Models.Community", "Community")
                         .WithMany("Posts")
                         .HasForeignKey("CommunityId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("SmmAnalyzerPrototype.Data.Models.User", null)
+                        .WithMany("Posts")
+                        .HasForeignKey("UserId");
+
+                    b.Navigation("Author");
 
                     b.Navigation("Community");
                 });
@@ -506,7 +508,7 @@ namespace SmmAnalyzerPrototype.Data.Migrations
 
             modelBuilder.Entity("SmmAnalyzerPrototype.Data.Models.User", b =>
                 {
-                    b.Navigation("Communities");
+                    b.Navigation("Posts");
                 });
 #pragma warning restore 612, 618
         }

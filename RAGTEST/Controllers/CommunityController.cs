@@ -1,8 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using SmmAnalyzerPrototype.Data.Models.DTO.Community;
+using System.Security.Claims;
 
 namespace RAGTEST.Controllers
 {
+    [Authorize]
     public class CommunityController : Controller
     {
         private readonly IHttpClientFactory _httpClientFactory;
@@ -12,59 +15,67 @@ namespace RAGTEST.Controllers
             _httpClientFactory = httpClientFactory;
         }
 
-        // GET: /Community
         public async Task<IActionResult> Index()
         {
-            var client = _httpClientFactory.CreateClient("Api");
+            var client = CreateApiClient();
+
             var response = await client.GetAsync("api/communityapi/getall");
             if (response.IsSuccessStatusCode)
             {
                 var communities = await response.Content.ReadFromJsonAsync<List<CommunityDto>>();
                 return View(communities ?? new());
             }
+
             return View(new List<CommunityDto>());
         }
 
-        // GET: /Community/Create
         public IActionResult Create() => View();
 
-        // POST: /Community/Create
         [HttpPost]
-        //[ValidateAntiForgeryToken]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(CreateCommunityRequest request)
         {
-            if (!ModelState.IsValid) return View(request);
+            if (!ModelState.IsValid)
+                return View(request);
 
-            var client = _httpClientFactory.CreateClient("Api");
+            var client = CreateApiClient();
+
             var response = await client.PostAsJsonAsync("api/communityapi/create", request);
             if (response.IsSuccessStatusCode)
                 return RedirectToAction(nameof(Index));
 
-            ModelState.AddModelError("", "Ошибка при создании сообщества");
+            var error = await response.Content.ReadAsStringAsync();
+            ModelState.AddModelError("", string.IsNullOrWhiteSpace(error)
+                ? "Ошибка при создании сообщества"
+                : error.Trim('"'));
+
             return View(request);
         }
 
-        // GET: /Community/Edit/{id}
         public async Task<IActionResult> Edit(Guid id)
         {
-            var client = _httpClientFactory.CreateClient("Api");
-            var response = await client.GetAsync($"api/communityapi/GetById/{id}");
-            if (!response.IsSuccessStatusCode) return NotFound();
+            var client = CreateApiClient();
+
+            var response = await client.GetAsync($"api/communityapi/getbyid/{id}");
+            if (!response.IsSuccessStatusCode)
+                return NotFound();
 
             var community = await response.Content.ReadFromJsonAsync<CommunityDto>();
-            if (community == null) return NotFound();
+            if (community == null)
+                return NotFound();
 
             var request = new UpdateCommunityRequest
             {
                 Name = community.Name,
                 TargetAudience = community.TargetAudience,
-                StyleProfile = community.StyleProfile
+                StyleProfile = community.StyleProfile,
+                VkInput = community.VkInput,
             };
+
             ViewBag.Id = id;
             return View(request);
         }
 
-        // POST: /Community/Edit/{id}
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(Guid id, UpdateCommunityRequest request)
@@ -75,35 +86,55 @@ namespace RAGTEST.Controllers
                 return View(request);
             }
 
-            var client = _httpClientFactory.CreateClient("Api");
-            var response = await client.PutAsJsonAsync($"api/communityapi/Update/{id}", request);
+            var client = CreateApiClient();
+
+            var response = await client.PutAsJsonAsync($"api/communityapi/update/{id}", request);
             if (response.IsSuccessStatusCode)
                 return RedirectToAction(nameof(Index));
 
-            ModelState.AddModelError("", "Ошибка при обновлении");
+            var error = await response.Content.ReadAsStringAsync();
+            ModelState.AddModelError("", string.IsNullOrWhiteSpace(error)
+                ? "Ошибка при обновлении"
+                : error.Trim('"'));
+
             ViewBag.Id = id;
             return View(request);
         }
 
-        // GET: /Community/Delete/{id}
         public async Task<IActionResult> Delete(Guid id)
         {
-            var client = _httpClientFactory.CreateClient("Api");
-            var response = await client.GetAsync($"api/communityapi/GetById/{id}");
-            if (!response.IsSuccessStatusCode) return NotFound();
+            var client = CreateApiClient();
+
+            var response = await client.GetAsync($"api/communityapi/getbyid/{id}");
+            if (!response.IsSuccessStatusCode)
+                return NotFound();
 
             var community = await response.Content.ReadFromJsonAsync<CommunityDto>();
             return View(community);
         }
 
-        // POST: /Community/Delete/{id}
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(Guid id)
         {
-            var client = _httpClientFactory.CreateClient("Api");
-            await client.DeleteAsync($"api/communityapi/delete/{id}");
+            var client = CreateApiClient();
+
+            var response = await client.DeleteAsync($"api/communityapi/delete/{id}");
+            if (!response.IsSuccessStatusCode)
+                return NotFound();
+
             return RedirectToAction(nameof(Index));
+        }
+
+        private HttpClient CreateApiClient()
+        {
+            var client = _httpClientFactory.CreateClient("Api");
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (!string.IsNullOrWhiteSpace(userId))
+                client.DefaultRequestHeaders.Add("X-User-Id", userId);
+
+            return client;
         }
     }
 }

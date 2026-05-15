@@ -25,6 +25,15 @@
             </div>
 
             <div class="mb-3">
+                <label asp-for="VkInput" class="form-label">Ссылка или ID сообщества ВКонтакте</label>
+                <input asp-for="VkInput" class="form-control" placeholder="Например: https://vk.com/ulstu, ulstu, club123456 или 123456" />
+                <span asp-validation-for="VkInput" class="text-danger"></span>
+                <div class="form-text">
+                    Это поле используется для загрузки истории публикаций и расчета вовлеченности.
+                </div>
+            </div>
+
+            <div class="mb-3">
                 <label asp-for="TargetAudience" class="form-label">Целевая аудитория</label>
                 <input asp-for="TargetAudience" class="form-control" placeholder="Опишите целевую аудиторию" />
                 <span asp-validation-for="TargetAudience" class="text-danger small"></span>

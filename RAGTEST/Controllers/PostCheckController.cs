@@ -1,10 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using RAGTEST.Models;
 using SmmAnalyzerPrototype.Data.Models.DTO.Post;
 using System.Text.Json;
 
 namespace RAGTEST.Controllers
 {
+    [Authorize]
     public class PostCheckController : Controller
     {
         private readonly HttpClient _client;

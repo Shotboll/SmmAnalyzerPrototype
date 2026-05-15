@@ -1,24 +1,38 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using RAGTEST.Models;
 using SmmAnalyzerPrototype.Data.Models.DTO.Community;
 using SmmAnalyzerPrototype.Data.Models.DTO.Post;
 
 namespace RAGTEST.Controllers
 {
+    [Authorize]
     public class PostController : Controller
     {
-        private readonly HttpClient _client;
+        private readonly IHttpClientFactory _httpClientFactory;
 
         public PostController(IHttpClientFactory httpClientFactory)
         {
-            _client = httpClientFactory.CreateClient("Api");
+            _httpClientFactory = httpClientFactory;
+        }
+
+        private HttpClient CreateApiClient()
+        {
+            var client = _httpClientFactory.CreateClient("Api");
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+            if (!string.IsNullOrWhiteSpace(userId))
+                client.DefaultRequestHeaders.Add("X-User-Id", userId);
+
+            return client;
         }
 
         [HttpGet]
         public async Task<IActionResult> Index()
         {
-            var posts = await _client.GetFromJsonAsync<List<PostListItemDto>>("api/postapi/getall")
-                        ?? new List<PostListItemDto>();
+            var client = CreateApiClient();
+
+            var posts = await client.GetFromJsonAsync<List<PostListItemDto>>("api/postapi/getall") ?? new List<PostListItemDto>(); ;
 
             return View(posts);
         }
@@ -26,8 +40,9 @@ namespace RAGTEST.Controllers
         [HttpGet]
         public async Task<IActionResult> Create()
         {
-            var communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall")
-                              ?? new List<CommunityDto>();
+            var client = CreateApiClient();
+
+            var communities = await client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall") ?? new List<CommunityDto>();
 
             var model = new PostCreateModel
             {
@@ -41,8 +56,9 @@ namespace RAGTEST.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(PostCreateModel model)
         {
-            model.Communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall")
-                               ?? new List<CommunityDto>();
+            var client = CreateApiClient();
+
+            model.Communities = await client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall") ?? new List<CommunityDto>();
 
             if (!ModelState.IsValid)
                 return View(model);
@@ -53,7 +69,7 @@ namespace RAGTEST.Controllers
                 CommunityId = model.CommunityId
             };
 
-            var response = await _client.PostAsJsonAsync("api/postapi/create", request);
+            var response = await client.PostAsJsonAsync("api/postapi/create", request);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -75,12 +91,14 @@ namespace RAGTEST.Controllers
         [HttpGet]
         public async Task<IActionResult> Edit(Guid id)
         {
-            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{id}");
+            var client = CreateApiClient();
+
+            var post = await client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{id}");
+
             if (post == null)
                 return NotFound();
 
-            var communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall")
-                              ?? new List<CommunityDto>();
+            var communities = await client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall") ?? new List<CommunityDto>();
 
             var model = new PostCreateModel
             {
@@ -97,7 +115,9 @@ namespace RAGTEST.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(PostCreateModel model)
         {
-            model.Communities = await _client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall")
+            var client = CreateApiClient();
+
+            model.Communities = await client.GetFromJsonAsync<List<CommunityDto>>("api/communityapi/getall")
                                ?? new List<CommunityDto>();
 
             if (!ModelState.IsValid)
@@ -109,7 +129,7 @@ namespace RAGTEST.Controllers
                 CommunityId = model.CommunityId
             };
 
-            var response = await _client.PutAsJsonAsync($"api/postapi/update/{model.PostId}", request);
+            var response = await client.PutAsJsonAsync($"api/postapi/update/{model.PostId}", request);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -123,7 +143,9 @@ namespace RAGTEST.Controllers
         [HttpGet]
         public async Task<IActionResult> Details(Guid id)
         {
-            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{id}");
+            var client = CreateApiClient();
+
+            var post = await client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{id}");
 
             if (post == null)
                 return NotFound();

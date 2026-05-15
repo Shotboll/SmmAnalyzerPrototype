@@ -14,13 +14,16 @@ namespace SmmAnalyzerPrototype.Data.Models
         public string Login { get; set; } = string.Empty;
 
         [Required]
-        [MaxLength(255)]
-        public string Password { get; set; } = string.Empty;
+        [MaxLength(500)]
+        public string PasswordHash { get; set; } = string.Empty;
 
         [MaxLength(255)]
         [EmailAddress]
         public string? Email { get; set; }
 
-        public virtual ICollection<Post> Posts { get; set; } = new List<Post>();
+        [Column("created_at")]
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public virtual ICollection<Community> Communities { get; set; } = new List<Community>();
     }
 }

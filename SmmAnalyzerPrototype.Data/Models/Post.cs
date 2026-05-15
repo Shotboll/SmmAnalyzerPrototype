@@ -22,12 +22,7 @@ namespace SmmAnalyzerPrototype.Data.Models
 
         [MaxLength(50)]
         public string Status { get; set; } = "Draft";
-
-        public Guid AuthorId { get; set; }
-
-        [ForeignKey(nameof(AuthorId))]
-        public virtual User Author { get; set; } = null!;
-
+            
         public Guid CommunityId { get; set; }
 
         [ForeignKey(nameof(CommunityId))]
