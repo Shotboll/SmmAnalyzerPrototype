@@ -252,8 +252,10 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 Title = doc.Title,
                 Content = doc.Content,
                 Category = doc.Category,
-                CommunityId = doc.CommunityId
+                CommunityId = doc.CommunityId,
+                CommunityName = doc.Community?.Name ?? "Не указано"
             };
+
             if (doc.Chunks != null)
             {
                 dto.Chunks = doc.Chunks.Select(c => new RegulationChunkDto
@@ -264,6 +266,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                     CreatedAt = c.CreatedAt
                 }).ToList();
             }
+
             return dto;
         }
 

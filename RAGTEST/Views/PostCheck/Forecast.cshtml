@@ -32,7 +32,7 @@
 
                         <div class="d-grid">
                             <button type="submit" class="btn btn-primary btn-lg rounded-3" id="submitBtn">
-                                📊 Сгенерировать прогноз
+                                @(Model.Result != null ? "Сгенерировать заново" : "Сгенерировать прогноз")
                             </button>
                         </div>
                     </form>

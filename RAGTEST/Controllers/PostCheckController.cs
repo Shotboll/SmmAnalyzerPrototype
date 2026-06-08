@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using RAGTEST.Models;
 using SmmAnalyzerPrototype.Data.Models.DTO.Post;
+using System.Security.Claims;
 using System.Text.Json;
 
 namespace RAGTEST.Controllers
@@ -9,17 +10,30 @@ namespace RAGTEST.Controllers
     [Authorize]
     public class PostCheckController : Controller
     {
-        private readonly HttpClient _client;
+        private readonly IHttpClientFactory _httpClientFactory;
 
         public PostCheckController(IHttpClientFactory httpClientFactory)
         {
-            _client = httpClientFactory.CreateClient("Api");
+            _httpClientFactory = httpClientFactory;
+        }
+
+        private HttpClient CreateApiClient()
+        {
+            var client = _httpClientFactory.CreateClient("Api");
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (!string.IsNullOrWhiteSpace(userId))
+                client.DefaultRequestHeaders.Add("X-User-Id", userId);
+
+            return client;
         }
 
         [HttpGet]
         public async Task<IActionResult> Grammar(Guid postId)
         {
-            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{postId}");
+            var client = CreateApiClient();
+
+            var post = await client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{postId}");
             if (post == null)
                 return NotFound();
 
@@ -74,7 +88,9 @@ namespace RAGTEST.Controllers
         [HttpPost]
         public async Task<IActionResult> ExplainGrammarItemProxy([FromBody] ExplainGrammarItemRequest request)
         {
-            var response = await _client.PostAsJsonAsync("api/postapi/explaingrammaritem", request);
+            var client = CreateApiClient();
+
+            var response = await client.PostAsJsonAsync("api/postapi/explaingrammaritem", request);
 
             if (!response.IsSuccessStatusCode)
                 return StatusCode((int)response.StatusCode);
@@ -87,7 +103,9 @@ namespace RAGTEST.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Grammar(GrammarCheckPageModel model)
         {
-            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{model.PostId}");
+            var client = CreateApiClient();
+
+            var post = await client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{model.PostId}");
             if (post == null)
                 return NotFound();
 
@@ -95,7 +113,7 @@ namespace RAGTEST.Controllers
             model.CommunityName = post.CommunityName;
             model.Text = post.Text;
 
-            var response = await _client.PostAsync($"api/postapi/rungrammarcheck/{model.PostId}", null);
+            var response = await client.PostAsync($"api/postapi/rungrammarcheck/{model.PostId}", null);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -115,7 +133,9 @@ namespace RAGTEST.Controllers
         [HttpGet]
         public async Task<IActionResult> Style(Guid postId)
         {
-            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{postId}");
+            var client = CreateApiClient();
+
+            var post = await client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{postId}");
             if (post == null)
                 return NotFound();
 
@@ -146,7 +166,9 @@ namespace RAGTEST.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Style(StyleCheckPageModel model)
         {
-            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{model.PostId}");
+            var client = CreateApiClient();
+
+            var post = await client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{model.PostId}");
             if (post == null)
                 return NotFound();
 
@@ -154,7 +176,7 @@ namespace RAGTEST.Controllers
             model.CommunityName = post.CommunityName;
             model.Text = post.Text;
 
-            var response = await _client.PostAsync($"api/postapi/runstylecheck/{model.PostId}", null);
+            var response = await client.PostAsync($"api/postapi/runstylecheck/{model.PostId}", null);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -177,7 +199,9 @@ namespace RAGTEST.Controllers
         [HttpGet]
         public async Task<IActionResult> Regulations(Guid postId)
         {
-            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{postId}");
+            var client = CreateApiClient();
+
+            var post = await client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{postId}");
             if (post == null)
                 return NotFound();
 
@@ -200,7 +224,9 @@ namespace RAGTEST.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Regulations(RegulationCheckPageModel model)
         {
-            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{model.PostId}");
+            var client = CreateApiClient();
+
+            var post = await client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{model.PostId}");
             if (post == null)
                 return NotFound();
 
@@ -208,7 +234,7 @@ namespace RAGTEST.Controllers
             model.CommunityName = post.CommunityName;
             model.Text = post.Text;
 
-            var response = await _client.PostAsync($"api/postapi/runregulationcheck/{model.PostId}", null);
+            var response = await client.PostAsync($"api/postapi/runregulationcheck/{model.PostId}", null);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -229,29 +255,53 @@ namespace RAGTEST.Controllers
         [HttpGet]
         public async Task<IActionResult> Forecast(Guid postId)
         {
-            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{postId}");
-            if (post == null) return NotFound();
+            var client = CreateApiClient();
 
-            return View(new ForecastPageModel
+            var post = await client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{postId}");
+            if (post == null)
+                return NotFound();
+
+            var model = new ForecastPageModel
             {
                 PostId = post.Id,
                 CommunityName = post.CommunityName,
                 Text = post.Text,
                 ForecastCheckedAt = post.ForecastCheckedAt
-            });
+            };
+
+            if (post.ForecastCheckedAt != null)
+            {
+                model.Result = new EngagementForecastDto
+                {
+                    Level = post.ForecastLevel ?? string.Empty,
+                    QualityScore = post.ForecastQualityScore,
+                    ExpectedLikes = post.ForecastLikes,
+                    ExpectedComments = post.ForecastComments,
+                    ExpectedViews = post.ForecastViews,
+                    ExpectedERPercent = post.ForecastERPercent,
+                    Reasoning = post.ForecastReasoning ?? string.Empty,
+                    KeyFactors = post.ForecastKeyFactors ?? new List<string>(),
+                    Risks = post.ForecastRisks ?? new List<string>(),
+                    ComparisonWithAvg = post.ForecastComparison ?? string.Empty
+                };
+            }
+
+            return View(model);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Forecast(ForecastPageModel model)
         {
-            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{model.PostId}");
+            var client = CreateApiClient();
+
+            var post = await client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{model.PostId}");
             if (post == null) return NotFound();
 
             model.CommunityName = post.CommunityName;
             model.Text = post.Text;
 
-            var response = await _client.PostAsync($"api/postapi/runforecast/{model.PostId}", null);
+            var response = await client.PostAsync($"api/postapi/runforecast/{model.PostId}", null);
             if (response.IsSuccessStatusCode)
             {
                 model.Result = await response.Content.ReadFromJsonAsync<EngagementForecastDto>();
@@ -267,29 +317,48 @@ namespace RAGTEST.Controllers
         [HttpGet]
         public async Task<IActionResult> Recommendations(Guid postId)
         {
-            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{postId}");
-            if (post == null) return NotFound();
+            var client = CreateApiClient();
 
-            return View(new RecommendationsPageModel
+            var post = await client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{postId}");
+            if (post == null)
+                return NotFound();
+
+            var model = new RecommendationsPageModel
             {
                 PostId = post.Id,
                 CommunityName = post.CommunityName,
                 Text = post.Text,
                 RecommendationsCheckedAt = post.RecommendationsCheckedAt
-            });
+            };
+
+            if (post.RecommendationsCheckedAt != null)
+            {
+                model.Result = new ContentRecommendationsDto
+                {
+                    TextImprovements = post.RecommendationsText ?? new List<string>(),
+                    StructuralChanges = post.RecommendationsStruct ?? new List<string>(),
+                    TopicIdeas = post.RecommendationsTopics ?? new List<string>(),
+                    EngagementBoosters = post.RecommendationsBoosters ?? new List<string>(),
+                    OverallAdvice = post.RecommendationsAdvice ?? string.Empty
+                };
+            }
+
+            return View(model);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Recommendations(RecommendationsPageModel model)
         {
-            var post = await _client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{model.PostId}");
+            var client = CreateApiClient();
+
+            var post = await client.GetFromJsonAsync<PostDetailsDto>($"api/postapi/getbyid/{model.PostId}");
             if (post == null) return NotFound();
 
             model.CommunityName = post.CommunityName;
             model.Text = post.Text;
 
-            var response = await _client.PostAsync($"api/postapi/runrecommendations/{model.PostId}", null);
+            var response = await client.PostAsync($"api/postapi/runrecommendations/{model.PostId}", null);
             if (response.IsSuccessStatusCode)
             {
                 model.Result = await response.Content.ReadFromJsonAsync<ContentRecommendationsDto>();

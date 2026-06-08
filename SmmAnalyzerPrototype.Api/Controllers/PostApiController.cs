@@ -217,7 +217,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 Text = request.Text.Trim(),
                 CommunityId = community.Id,
                 CreatedAt = DateTime.UtcNow,
-                Status = "Draft"
+                Status = "Черновик"
             };
 
             var analysisResult = new AnalysisResult
@@ -275,7 +275,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
 
             if (textChanged || communityChanged)
             {
-                post.Status = "Draft";
+                post.Status = "Черновик";
 
                 if (post.AnalysisResult != null)
                 {
@@ -412,7 +412,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
 
             post.AnalysisResult.GrammarCheckedAt = DateTime.UtcNow;
             post.AnalysisResult.UpdatedAt = DateTime.UtcNow;
-            post.Status = "Analyzed";
+            post.Status = "Проанализирован";
 
             await _context.SaveChangesAsync();
 
@@ -469,7 +469,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
             post.AnalysisResult.StyleIssuesJson = JsonSerializer.Serialize(result.Issues ?? new List<string>());
             post.AnalysisResult.StyleRecommendationsJson = JsonSerializer.Serialize(result.Recommendations ?? new List<string>());
             post.AnalysisResult.UpdatedAt = DateTime.UtcNow;
-            post.Status = "Analyzed";
+            post.Status = "Проанализирован";
 
             await _context.SaveChangesAsync();
 
@@ -541,7 +541,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
             post.AnalysisResult.HasRegulationViolations = response.HasViolations;
             post.AnalysisResult.RegulationComment = response.Comment;
             post.AnalysisResult.UpdatedAt = DateTime.UtcNow;
-            post.Status = "Analyzed";
+            post.Status = "Проанализирован";
 
             await _context.SaveChangesAsync();
 
@@ -632,7 +632,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
             result.ForecastCheckedAt = DateTime.UtcNow;
             result.UpdatedAt = DateTime.UtcNow;
 
-            post.Status = "Analyzed";
+            post.Status = "Проанализирован";
 
             if (post.AnalysisResult == null)
                 _context.AnalysisResults.Add(result);
@@ -689,7 +689,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
             result.RecommendationsCheckedAt = DateTime.UtcNow;
             result.UpdatedAt = DateTime.UtcNow;
 
-            post.Status = "Analyzed";
+            post.Status = "Проанализирован";
 
             if (post.AnalysisResult == null)
                 _context.AnalysisResults.Add(result);
