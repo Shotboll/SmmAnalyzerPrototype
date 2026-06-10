@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using SmmAnalyzerPrototype.Data.Enums;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SmmAnalyzerPrototype.Data.Models
@@ -21,8 +22,8 @@ namespace SmmAnalyzerPrototype.Data.Models
         public DateTime? UpdatedAt { get; set; }
 
         [MaxLength(50)]
-        public string Status { get; set; } = "Draft";
-            
+        public PostStatus Status { get; set; } = PostStatus.Draft;
+                
         public Guid CommunityId { get; set; }
 
         [ForeignKey(nameof(CommunityId))]

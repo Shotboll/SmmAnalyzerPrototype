@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using SmmAnalyzerPrototype.Api.Services;
 using SmmAnalyzerPrototype.Data.Data;
+using SmmAnalyzerPrototype.Data.Enums;
 using SmmAnalyzerPrototype.Data.Models;
 using SmmAnalyzerPrototype.Data.Models.DTO.Post;
 using System.Text.Json;
@@ -31,6 +32,49 @@ namespace SmmAnalyzerPrototype.Api.Controllers
             _logger = logger;
         }
 
+        private static string GetPostStatusText(PostStatus status)
+        {
+            return status switch
+            {
+                PostStatus.Draft => "Черновик",
+                PostStatus.PartiallyAnalyzed => "Частично проанализирован",
+                PostStatus.Analyzed => "Полностью проанализирован",
+                _ => "Неизвестно"
+            };
+        }
+
+        private static PostStatus CalculatePostStatus(AnalysisResult? analysisResult)
+        {
+            if (analysisResult == null)
+                return PostStatus.Draft;
+
+            var checksCount = 0;
+
+            if (analysisResult.GrammarCheckedAt.HasValue)
+                checksCount++;
+
+            if (analysisResult.StyleCheckedAt.HasValue)
+                checksCount++;
+
+            if (analysisResult.RegulationCheckedAt.HasValue)
+                checksCount++;
+
+            if (analysisResult.ForecastCheckedAt.HasValue)
+                checksCount++;
+
+            if (analysisResult.RecommendationsCheckedAt.HasValue)
+                checksCount++;
+
+            if (checksCount == 0)
+                return PostStatus.Draft;
+
+            if (checksCount >= 5)
+                return PostStatus.Analyzed;
+
+            return PostStatus.PartiallyAnalyzed;
+        }
+
+
         [HttpGet]
         public async Task<ActionResult<List<PostListItemDto>>> GetAll()
         {
@@ -53,6 +97,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 CommunityName = p.Community.Name,
                 CreatedAt = p.CreatedAt,
                 Status = p.Status,
+                StatusText = GetPostStatusText(p.Status),
                 GrammarChecked = p.AnalysisResult?.GrammarCheckedAt != null,
                 StyleChecked = p.AnalysisResult?.StyleCheckedAt != null,
                 RegulationChecked = p.AnalysisResult?.RegulationCheckedAt != null,
@@ -90,6 +135,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 CommunityName = post.Community.Name,
                 CreatedAt = post.CreatedAt,
                 Status = post.Status,
+                StatusText = GetPostStatusText(post.Status),
                 GrammarCheckedAt = post.AnalysisResult?.GrammarCheckedAt,
                 StyleCheckedAt = post.AnalysisResult?.StyleCheckedAt,
                 RegulationCheckedAt = post.AnalysisResult?.RegulationCheckedAt,
@@ -126,7 +172,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                         Suggestion = x.Suggestion ?? string.Empty,
                         Type = x.ErrorType ?? string.Empty,
                         Offset = x.Position,
-                        Length = 0,
+                        Length = !string.IsNullOrWhiteSpace(x.Fragment) ? x.Fragment.Length : 1,
                         Message = x.Message ?? string.Empty,
                         IsSuspicious = x.IsSuspicious,
                         Sentence = ExtractSentenceByOffset(post.Text, x.Position)
@@ -215,9 +261,9 @@ namespace SmmAnalyzerPrototype.Api.Controllers
             {
                 Id = Guid.NewGuid(),
                 Text = request.Text.Trim(),
-                CommunityId = community.Id,
+                CommunityId = request.CommunityId,
                 CreatedAt = DateTime.UtcNow,
-                Status = "Черновик"
+                Status = PostStatus.Draft
             };
 
             var analysisResult = new AnalysisResult
@@ -229,6 +275,10 @@ namespace SmmAnalyzerPrototype.Api.Controllers
             _context.Posts.Add(post);
             _context.AnalysisResults.Add(analysisResult);
 
+            await CheckGrammarForPostAsync(post, analysisResult);
+
+            post.Status = CalculatePostStatus(analysisResult);
+
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetById), new { id = post.Id }, new PostDetailsDto
@@ -238,7 +288,8 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 CommunityId = post.CommunityId,
                 CommunityName = community.Name,
                 CreatedAt = post.CreatedAt,
-                Status = post.Status
+                Status = post.Status,
+                GrammarCheckedAt = analysisResult.GrammarCheckedAt
             });
         }
 
@@ -275,7 +326,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
 
             if (textChanged || communityChanged)
             {
-                post.Status = "Черновик";
+                post.Status = PostStatus.Draft;
 
                 if (post.AnalysisResult != null)
                 {
@@ -304,6 +355,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
 
                     post.AnalysisResult.HasRegulationViolations = null;
                     post.AnalysisResult.RegulationComment = null;
+
                     post.AnalysisResult.EngagementForecastJson = null;
                     post.AnalysisResult.RecommendationsJson = null;
 
@@ -315,65 +367,59 @@ namespace SmmAnalyzerPrototype.Api.Controllers
             return NoContent();
         }
 
-        [HttpPost]
-        public async Task<ActionResult<ExplainGrammarItemResponse>> ExplainGrammarItem([FromBody] ExplainGrammarItemRequest request)
-        {
-            if (request == null || string.IsNullOrWhiteSpace(request.Fragment))
-                return BadRequest();
-
-            var result = await _llmService.ExplainSingleGrammarErrorAsync(request);
-            return Ok(result);
-        }
-
-        [HttpPost("{postId}")]
-        public async Task<ActionResult<EnhancedGrammarResponse>> RunGrammarCheck(Guid postId)
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(Guid id)
         {
             var post = await _context.Posts
                 .Include(p => p.AnalysisResult)
-                .FirstOrDefaultAsync(p => p.Id == postId);
+                .FirstOrDefaultAsync(p => p.Id == id);
 
             if (post == null)
-                return NotFound();
+                return NotFound("Пост не найден.");
 
+            if (post.AnalysisResult != null)
+            {
+                var grammarErrors = await _context.GrammarErrors
+                    .Where(x => x.AnalysisResultId == post.AnalysisResult.PostId)
+                    .ToListAsync();
+
+                var prohibitedMatches = await _context.ProhibitedTopicMatches
+                    .Where(x => x.AnalysisResultId == post.AnalysisResult.PostId)
+                    .ToListAsync();
+
+                _context.GrammarErrors.RemoveRange(grammarErrors);
+                _context.ProhibitedTopicMatches.RemoveRange(prohibitedMatches);
+                _context.AnalysisResults.Remove(post.AnalysisResult);
+            }
+
+            _context.Posts.Remove(post);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        private async Task<EnhancedGrammarResponse> CheckGrammarForPostAsync(Data.Models.Post post, AnalysisResult analysisResult)
+        {
             var rawErrors = await _languageToolService.CheckTextAsync(post.Text);
             var filterResult = _grammarFilterService.Filter(rawErrors, post.Text);
 
             var acceptedErrors = filterResult.AcceptedErrors;
 
-            //var explanations = await _llmService.ExplainGrammarErrorsAsync(post.Text, acceptedErrors);
-            var explanations = new List<GrammarExplanationDto>();
-            var explanationMap = explanations.ToDictionary(x => x.Index, x => x);
-
-            var cards = acceptedErrors.Select((error, index) =>
+            var cards = acceptedErrors.Select(error => new GrammarResultCardDto
             {
-                explanationMap.TryGetValue(index, out var explanation);
-
-                return new GrammarResultCardDto
-                {
-                    Original = error.Fragment ?? string.Empty,
-                    Correction = error.Suggestion ?? string.Empty,
-                    Type = error.Type ?? string.Empty,
-                    Hint = explanation?.Hint ?? error.Message ?? string.Empty,
-                    Explanation = explanation?.Explanation ?? string.Empty,
-                    Offset = error.Offset,
-                    Length = error.Length,
-                    IsSuspicious = false,
-                    Sentence = ExtractSentenceByOffset(post.Text, error.Offset)
-                };
+                Original = error.Fragment ?? string.Empty,
+                Correction = error.Suggestion ?? string.Empty,
+                Type = error.Type ?? string.Empty,
+                Hint = error.Message ?? string.Empty,
+                Explanation = string.Empty,
+                Offset = error.Offset,
+                Length = error.Length,
+                IsSuspicious = false,
+                Sentence = ExtractSentenceByOffset(post.Text, error.Offset)
             }).ToList();
 
-            if (post.AnalysisResult == null)
-            {
-                post.AnalysisResult = new AnalysisResult
-                {
-                    PostId = post.Id,
-                    UpdatedAt = DateTime.UtcNow
-                };
-                _context.AnalysisResults.Add(post.AnalysisResult);
-            }
-
             var oldErrors = await _context.GrammarErrors
-                .Where(x => x.AnalysisResultId == post.AnalysisResult.PostId)
+                .Where(x => x.AnalysisResultId == analysisResult.PostId)
                 .ToListAsync();
 
             _context.GrammarErrors.RemoveRange(oldErrors);
@@ -383,15 +429,13 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 _context.GrammarErrors.Add(new GrammarError
                 {
                     Id = Guid.NewGuid(),
-                    AnalysisResultId = post.AnalysisResult.PostId,
+                    AnalysisResultId = analysisResult.PostId,
                     Fragment = card.Original,
                     Suggestion = card.Correction,
                     ErrorType = card.Type,
-                    Message = string.IsNullOrWhiteSpace(card.Explanation)
-                        ? card.Hint
-                        : $"{card.Explanation} {card.Hint}".Trim(),
+                    Message = card.Hint,
                     Position = card.Offset,
-                    IsSuspicious = card.IsSuspicious
+                    IsSuspicious = false
                 });
             }
 
@@ -400,7 +444,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 _context.GrammarErrors.Add(new GrammarError
                 {
                     Id = Guid.NewGuid(),
-                    AnalysisResultId = post.AnalysisResult.PostId,
+                    AnalysisResultId = analysisResult.PostId,
                     Fragment = suspicious.Fragment ?? string.Empty,
                     Suggestion = suspicious.Suggestion,
                     ErrorType = suspicious.Type,
@@ -410,14 +454,10 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                 });
             }
 
-            post.AnalysisResult.GrammarCheckedAt = DateTime.UtcNow;
-            post.AnalysisResult.UpdatedAt = DateTime.UtcNow;
-            post.Status = "Проанализирован";
+            analysisResult.GrammarCheckedAt = DateTime.UtcNow;
+            analysisResult.UpdatedAt = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync();
-
-
-            return Ok(new EnhancedGrammarResponse
+            return new EnhancedGrammarResponse
             {
                 RawErrors = acceptedErrors,
                 Cards = cards,
@@ -433,7 +473,52 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                     IsSuspicious = true,
                     Sentence = ExtractSentenceByOffset(post.Text, x.Offset)
                 }).ToList()
-            });
+            };
+        }
+
+        [HttpPost]
+        public async Task<ActionResult<ExplainGrammarItemResponse>> ExplainGrammarItem([FromBody] ExplainGrammarItemRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Fragment))
+                return BadRequest();
+
+            var result = await _llmService.ExplainSingleGrammarErrorAsync(request);
+            return Ok(result);
+        }
+
+        [HttpPost("{postId}")]
+        public async Task<ActionResult<EnhancedGrammarResponse>> RunGrammarCheck(Guid postId)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+                return Unauthorized("Пользователь не определен.");
+
+            var post = await _context.Posts
+                .Include(p => p.Community)
+                .Include(p => p.AnalysisResult)
+                .FirstOrDefaultAsync(p => p.Id == postId && p.Community.UserId == userId.Value);
+
+            if (post == null)
+                return NotFound("Пост не найден.");
+
+            if (post.AnalysisResult == null)
+            {
+                post.AnalysisResult = new AnalysisResult
+                {
+                    PostId = post.Id,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                _context.AnalysisResults.Add(post.AnalysisResult);
+            }
+
+            var result = await CheckGrammarForPostAsync(post, post.AnalysisResult);
+
+            post.Status = CalculatePostStatus(post.AnalysisResult);
+
+            await _context.SaveChangesAsync();
+
+            return Ok(result);
         }
 
         [HttpPost("{postId}")]
@@ -469,7 +554,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
             post.AnalysisResult.StyleIssuesJson = JsonSerializer.Serialize(result.Issues ?? new List<string>());
             post.AnalysisResult.StyleRecommendationsJson = JsonSerializer.Serialize(result.Recommendations ?? new List<string>());
             post.AnalysisResult.UpdatedAt = DateTime.UtcNow;
-            post.Status = "Проанализирован";
+            post.Status = CalculatePostStatus(post.AnalysisResult);
 
             await _context.SaveChangesAsync();
 
@@ -541,7 +626,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
             post.AnalysisResult.HasRegulationViolations = response.HasViolations;
             post.AnalysisResult.RegulationComment = response.Comment;
             post.AnalysisResult.UpdatedAt = DateTime.UtcNow;
-            post.Status = "Проанализирован";
+            post.Status = CalculatePostStatus(post.AnalysisResult);
 
             await _context.SaveChangesAsync();
 
@@ -632,7 +717,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
             result.ForecastCheckedAt = DateTime.UtcNow;
             result.UpdatedAt = DateTime.UtcNow;
 
-            post.Status = "Проанализирован";
+            post.Status = CalculatePostStatus(result);
 
             if (post.AnalysisResult == null)
                 _context.AnalysisResults.Add(result);
@@ -689,7 +774,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
             result.RecommendationsCheckedAt = DateTime.UtcNow;
             result.UpdatedAt = DateTime.UtcNow;
 
-            post.Status = "Проанализирован";
+            post.Status = CalculatePostStatus(result);
 
             if (post.AnalysisResult == null)
                 _context.AnalysisResults.Add(result);

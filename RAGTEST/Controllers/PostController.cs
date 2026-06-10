@@ -140,6 +140,24 @@ namespace RAGTEST.Controllers
             return RedirectToAction(nameof(Details), new { id = model.PostId });
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(Guid id)
+        {
+            var client = CreateApiClient();
+
+            var response = await client.DeleteAsync($"api/postapi/delete/{id}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                TempData["Error"] = "Не удалось удалить пост.";
+                return RedirectToAction(nameof(Details), new { id });
+            }
+
+            TempData["Message"] = "Пост успешно удален.";
+            return RedirectToAction(nameof(Index));
+        }
+
         [HttpGet]
         public async Task<IActionResult> Details(Guid id)
         {

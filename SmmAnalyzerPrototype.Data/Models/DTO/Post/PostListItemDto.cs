@@ -1,4 +1,6 @@
-﻿namespace SmmAnalyzerPrototype.Data.Models.DTO.Post
+﻿using SmmAnalyzerPrototype.Data.Enums;
+
+namespace SmmAnalyzerPrototype.Data.Models.DTO.Post
 {
     public class PostListItemDto
     {
@@ -7,7 +9,8 @@
         public string CommunityName { get; set; } = string.Empty;
         public string AuthorLogin { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
-        public string? Status { get; set; }
+        public PostStatus Status { get; set; }
+        public string StatusText { get; set; } = string.Empty;
 
         public bool GrammarChecked { get; set; }
         public bool StyleChecked { get; set; }

@@ -1,427 +1,492 @@
 ﻿@model SmmAnalyzerPrototype.Data.Models.DTO.Post.PostDetailsDto
+@using System.Net
+@using System.Text
+@using SmmAnalyzerPrototype.Data.Models.DTO.Post
 
 @{
-    ViewData["Title"] = "Карточка поста";
+    ViewData["Title"] = "Детали поста";
 }
 
-<div class="page-header">
-    <h1 class="page-title">Карточка поста</h1>
-    <p class="page-subtitle">Текст публикации, доступные проверки и сохранённые результаты анализа.</p>
-</div>
+@functions {
+    private string BuildHighlightedText(string text, List<GrammarErrorDto>? grammarErrors, List<ViolationDto>? violations)
+    {
+        if (string.IsNullOrEmpty(text))
+            return string.Empty;
 
-<div class="app-card mb-4">
-    <div class="app-card-body">
-        <div class="details-meta-grid mb-4">
-            <div class="meta-box">
-                <div class="meta-box-label">Сообщество</div>
-                <div class="meta-box-value">@Model.CommunityName</div>
-            </div>
+        var highlights = new List<TextHighlightItem>();
 
-            <div class="meta-box">
-                <div class="meta-box-label">Автор</div>
-                <div class="meta-box-value">@Model.AuthorLogin</div>
-            </div>
+        if (grammarErrors != null)
+        {
+            foreach (var error in grammarErrors)
+            {
+                if (error.Offset < 0 || error.Offset >= text.Length)
+                    continue;
 
-            <div class="meta-box">
-                <div class="meta-box-label">Дата создания</div>
-                <div class="meta-box-value">@Model.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                var length = error.Length > 0 ? error.Length : (!string.IsNullOrWhiteSpace(error.Fragment) ? error.Fragment.Length : 1);
+
+                if (length <= 0)
+                    continue;
+
+                if (error.Offset + length > text.Length)
+                    length = text.Length - error.Offset;
+
+                highlights.Add(new TextHighlightItem
+                {
+                    Offset = error.Offset,
+                    Length = length,
+                    CssClass = error.IsSuspicious ? "text-warning-highlight" : "text-error-highlight",
+                    Title = BuildGrammarTitle(error)
+                });
+            }
+        }
+
+        if (violations != null)
+        {
+            foreach (var violation in violations)
+            {
+                if (string.IsNullOrWhiteSpace(violation.MatchedText))
+                    continue;
+
+                var index = text.IndexOf(violation.MatchedText, StringComparison.OrdinalIgnoreCase);
+
+                if (index < 0)
+                    continue;
+
+                highlights.Add(new TextHighlightItem
+                {
+                    Offset = index,
+                    Length = violation.MatchedText.Length,
+                    CssClass = "text-regulation-highlight",
+                    Title = BuildViolationTitle(violation)
+                });
+            }
+        }
+
+        var validHighlights = highlights
+            .Where(x => x.Offset >= 0 && x.Offset < text.Length && x.Length > 0)
+            .OrderBy(x => x.Offset)
+            .ToList();
+
+        var sb = new StringBuilder();
+        int currentIndex = 0;
+
+        foreach (var highlight in validHighlights)
+        {
+            if (highlight.Offset < currentIndex)
+                continue;
+
+            if (highlight.Offset > currentIndex)
+            {
+                var before = text.Substring(currentIndex, highlight.Offset - currentIndex);
+                sb.Append(WebUtility.HtmlEncode(before));
+            }
+
+            var length = Math.Min(highlight.Length, text.Length - highlight.Offset);
+            var fragment = text.Substring(highlight.Offset, length);
+
+            var tooltipText = WebUtility.HtmlEncode(highlight.Title).Replace("\n", "<br>");
+
+            sb.Append($"<span class=\"{highlight.CssClass}\" data-bs-toggle=\"tooltip\" data-bs-html=\"true\" data-bs-placement=\"top\" data-bs-custom-class=\"post-error-tooltip\" data-bs-title=\"{tooltipText}\">");
+            sb.Append(WebUtility.HtmlEncode(fragment));
+            sb.Append("</span>");
+
+            currentIndex = highlight.Offset + length;
+        }
+
+        if (currentIndex < text.Length)
+        {
+            sb.Append(WebUtility.HtmlEncode(text.Substring(currentIndex)));
+        }
+
+        return sb.ToString().Replace("\r\n", "<br />").Replace("\n", "<br />");
+    }
+
+    private string BuildGrammarTitle(GrammarErrorDto error)
+    {
+        var parts = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(error.Message))
+            parts.Add(error.Message);
+
+        if (!string.IsNullOrWhiteSpace(error.Suggestion))
+            parts.Add($"Исправление: {error.Suggestion}");
+
+        if (error.IsSuspicious)
+            parts.Add("Это сомнительное срабатывание, проверьте вручную.");
+
+        return string.Join("\n", parts);
+    }
+
+    private string BuildViolationTitle(ViolationDto violation)
+    {
+        var parts = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(violation.RuleShort))
+            parts.Add(violation.RuleShort);
+
+        if (!string.IsNullOrWhiteSpace(violation.Explanation))
+            parts.Add(violation.Explanation);
+
+        return string.Join("\n", parts);
+    }
+
+    private class TextHighlightItem
+    {
+        public int Offset { get; set; }
+        public int Length { get; set; }
+        public string CssClass { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+    }
+}
+
+<div class="container py-4">
+    <div class="details-page-header">
+        <div>
+            <h1 class="details-page-title">Детали поста</h1>
+
+            <div class="details-page-meta">
+                Сообщество: <strong>@Model.CommunityName</strong>
+                @if (!string.IsNullOrWhiteSpace(Model.AuthorLogin))
+                {
+                    <span> · Автор: @Model.AuthorLogin</span>
+                }
+                <span> · Статус: @Model.StatusText</span>
             </div>
         </div>
 
-        <div class="text-muted small mb-2">Текст поста</div>
-        <div class="post-content-box">@Model.Text</div>
+        <div class="details-actions">
+            <a asp-controller="Post" asp-action="Edit" asp-route-id="@Model.Id" class="details-action-btn details-action-edit">
+                <span class="details-action-icon">✏️</span>
+                <span>Редактировать</span>
+            </a>
+
+            <a asp-controller="Post" asp-action="Index" class="details-action-btn details-action-back">
+                <span class="details-action-icon">←</span>
+                <span>К списку</span>
+            </a>
+
+            <form asp-controller="Post" asp-action="Delete" asp-route-id="@Model.Id" method="post"
+                  onsubmit="return confirm('Удалить этот пост? Все результаты проверок по нему тоже будут удалены.');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="details-action-btn details-action-delete">
+                    <span class="details-action-icon">🗑️</span>
+                    <span>Удалить</span>
+                </button>
+            </form>
+        </div>
     </div>
-</div>
 
-<div class="app-card mb-4">
-    <div class="app-card-body">
-        <div class="section-header-line">
-            <div>
-                <h3 class="section-card-title mb-1">Действия</h3>
-                <p class="section-card-text mb-0">Запустите нужную проверку или вернитесь к общему списку.</p>
-            </div>
-        </div>
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 rounded-4">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4 class="mb-0">Текст поста</h4>
 
-        <div class="d-flex flex-wrap gap-2 mt-3">
-            <a asp-controller="PostCheck" asp-action="Grammar" asp-route-postId="@Model.Id" class="btn btn-primary">
-                Проверка на ошибки
-            </a>
-            <a asp-controller="PostCheck" asp-action="Style" asp-route-postId="@Model.Id" class="btn btn-primary">
-                Проверка стиля
-            </a>
-            <a asp-controller="PostCheck" asp-action="Regulations" asp-route-postId="@Model.Id" class="btn btn-primary">
-                Проверка регламентов
-            </a>
+                        @if (Model.GrammarCheckedAt.HasValue)
+                        {
+                            <span class="badge bg-light text-dark border">
+                                Ошибок: @(Model.GrammarErrors?.Count ?? 0)
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary-subtle text-secondary">
+                                Грамматика не проверена
+                            </span>
+                        }
+                    </div>
 
-            <a asp-controller="PostCheck" asp-action="Forecast" asp-route-postId="@Model.Id" class="btn btn btn-primary">
-                Прогноз вовлеченности
-            </a>
-            <a asp-controller="PostCheck" asp-action="Recommendations" asp-route-postId="@Model.Id" class="btn btn btn-primary">
-                Рекомендации
-            </a>
+                    <div class="post-text-box">
+                        @Html.Raw(BuildHighlightedText(Model.Text, Model.GrammarErrors, Model.RegulationViolations))
+                    </div>
 
-            <a asp-controller="Post" asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-outline-primary">
-                Редактировать пост
-            </a>
-            <a asp-controller="Post" asp-action="Index" class="btn btn-outline-secondary">
-                К списку постов
-            </a>
-        </div>
-    </div>
-</div>
+                    <div class="post-check-panel">
+                        <div class="post-check-panel-title">Запустить проверку</div>
 
-<div class="d-flex flex-column gap-4">
+                        <div class="post-check-actions">
+                            <a asp-controller="PostCheck" asp-action="Grammar" asp-route-postId="@Model.Id" class="post-check-btn">
+                                <span>✓</span>
+                                <span>Грамматика</span>
+                            </a>
 
-    <div class="app-card">
-        <div class="app-card-body">
-            <div class="details-section-head mb-3">
-                <div>
-                    <h3 class="section-card-title mb-1">Проверка на ошибки</h3>
-                    @if (Model.GrammarCheckedAt != null)
-                    {
-                        <div class="section-state success">Проверка выполнена</div>
-                        <div class="section-time">@Model.GrammarCheckedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
-                    }
-                    else
-                    {
-                        <div class="section-state neutral">Проверка ещё не выполнялась</div>
-                    }
+                            <a asp-controller="PostCheck" asp-action="Style" asp-route-postId="@Model.Id" class="post-check-btn">
+                                <span>🎯</span>
+                                <span>Стиль</span>
+                            </a>
+
+                            <a asp-controller="PostCheck" asp-action="Regulations" asp-route-postId="@Model.Id" class="post-check-btn">
+                                <span>📄</span>
+                                <span>Регламенты</span>
+                            </a>
+
+                            <a asp-controller="PostCheck" asp-action="Forecast" asp-route-postId="@Model.Id" class="post-check-btn">
+                                <span>📊</span>
+                                <span>Прогноз</span>
+                            </a>
+
+                            <a asp-controller="PostCheck" asp-action="Recommendations" asp-route-postId="@Model.Id" class="post-check-btn">
+                                <span>💡</span>
+                                <span>Рекомендации</span>
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            @if (Model.GrammarCheckedAt != null)
+            @if (Model.GrammarErrors != null && Model.GrammarErrors.Any())
             {
-                @if (Model.GrammarErrors.Any())
-                {
-                    <div class="row g-3">
-                        @foreach (var error in Model.GrammarErrors)
-                        {
-                            <div class="col-12 col-xl-6">
-                                <div class="inner-card h-100">
-                                    <div><strong>Фрагмент:</strong> @error.Fragment</div>
+                <div class="card shadow-sm border-0 rounded-4 mt-4">
+                    <div class="card-body p-4">
+                        <h4 class="mb-3">Замечания по чистоте текста</h4>
 
-                                    @if (!string.IsNullOrWhiteSpace(error.Suggestion))
-                                    {
-                                        <div><strong>Исправление:</strong> @error.Suggestion</div>
-                                    }
+                        <div class="d-flex flex-column gap-3">
+                            @foreach (var error in Model.GrammarErrors.OrderBy(x => x.Offset))
+                            {
+                                <div class="border rounded-4 p-3">
+                                    <div class="d-flex justify-content-between gap-3">
+                                        <div>
+                                            <div class="fw-semibold mb-1">
+                                                @error.Fragment
+                                            </div>
 
-                                    @if (!string.IsNullOrWhiteSpace(error.Type))
-                                    {
-                                        <div><strong>Тип:</strong> @error.Type</div>
-                                    }
+                                            <div class="text-muted small mb-2">
+                                                @error.Message
+                                            </div>
 
-                                    @if (!string.IsNullOrWhiteSpace(error.Message))
-                                    {
-                                        <div><strong>Комментарий:</strong> @error.Message</div>
-                                    }
+                                            @if (!string.IsNullOrWhiteSpace(error.Suggestion))
+                                            {
+                                                <div>
+                                                    <span class="text-muted">Вариант исправления:</span>
+                                                    <strong>@error.Suggestion</strong>
+                                                </div>
+                                            }
+                                        </div>
 
-                                    @if (error.IsSuspicious)
-                                    {
-                                        <div class="section-state warning mt-2">Сомнительный случай</div>
-                                    }
+                                        @if (error.IsSuspicious)
+                                        {
+                                            <span class="badge bg-warning-subtle text-warning align-self-start">
+                                                Сомнительно
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger-subtle text-danger align-self-start">
+                                                Ошибка
+                                            </span>
+                                        }
+                                    </div>
                                 </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (Model.RegulationViolations != null && Model.RegulationViolations.Any())
+            {
+                <div class="card shadow-sm border-0 rounded-4 mt-4">
+                    <div class="card-body p-4">
+                        <h4 class="mb-3">Нарушения регламентов</h4>
+
+                        <div class="d-flex flex-column gap-3">
+                            @foreach (var violation in Model.RegulationViolations)
+                            {
+                                <div class="border rounded-4 p-3">
+                                    <div class="fw-semibold mb-1 text-danger">
+                                        @violation.RuleShort
+                                    </div>
+
+                                    @if (!string.IsNullOrWhiteSpace(violation.MatchedText))
+                                    {
+                                        <div class="mb-2">
+                                            <span class="text-muted">Фрагмент:</span>
+                                            <strong>@violation.MatchedText</strong>
+                                        </div>
+                                    }
+
+                                    <div class="text-muted">
+                                        @violation.Explanation
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="col-lg-4">
+            <div class="d-flex flex-column gap-3">
+                <div class="check-summary-card">
+                    <h5 class="mb-3">Сводка проверок</h5>
+
+                    <div class="mb-2">
+                        <span class="check-status-dot @(Model.GrammarCheckedAt.HasValue ? "status-success" : "status-muted")"></span>
+                        Грамматика
+                    </div>
+
+                    <div class="mb-2">
+                        <span class="check-status-dot @(Model.StyleCheckedAt.HasValue ? "status-success" : "status-muted")"></span>
+                        Стиль
+                    </div>
+
+                    <div class="mb-2">
+                        <span class="check-status-dot @(Model.RegulationCheckedAt.HasValue ? ((Model.HasRegulationViolations ?? false) ? "status-danger" : "status-success") : "status-muted")"></span>
+                        Регламенты
+                    </div>
+
+                    <div class="mb-2">
+                        <span class="check-status-dot @(Model.ForecastCheckedAt.HasValue ? "status-success" : "status-muted")"></span>
+                        Прогноз вовлеченности
+                    </div>
+
+                    <div>
+                        <span class="check-status-dot @(Model.RecommendationsCheckedAt.HasValue ? "status-success" : "status-muted")"></span>
+                        Рекомендации
+                    </div>
+                </div>
+
+                @if (Model.StyleCheckedAt.HasValue)
+                {
+                    <div class="check-summary-card">
+                        <h5 class="mb-3">Стиль</h5>
+
+                        <div class="fw-semibold mb-2">
+                            @Model.StyleAssessment
+                        </div>
+
+                        <div class="text-muted">
+                            @Model.StyleSummary
+                        </div>
+                    </div>
+                }
+
+                @if (Model.RegulationCheckedAt.HasValue)
+                {
+                    <div class="check-summary-card">
+                        <h5 class="mb-3">Регламенты</h5>
+
+                        @if (Model.HasRegulationViolations ?? false)
+                        {
+                            <div class="alert alert-danger mb-2">
+                                Найдены нарушения: @(Model.RegulationViolations?.Count ?? 0)
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-success mb-2">
+                                Нарушения не найдены
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(Model.RegulationComment))
+                        {
+                            <div class="text-muted">
+                                @Model.RegulationComment
                             </div>
                         }
                     </div>
                 }
-                else
+
+                @if (Model.ForecastCheckedAt.HasValue)
                 {
-                    <div class="empty-state">Ошибок не найдено.</div>
-                }
-            }
-        </div>
-    </div>
+                    <div class="check-summary-card">
+                        <h5 class="mb-3">Прогноз</h5>
 
-    <div class="app-card">
-        <div class="app-card-body">
-            <div class="details-section-head mb-3">
-                <div>
-                    <h3 class="section-card-title mb-1">Проверка стиля</h3>
-                    @if (Model.StyleCheckedAt != null)
-                    {
-                        <div class="section-state success">Проверка выполнена</div>
-                        <div class="section-time">@Model.StyleCheckedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
-                    }
-                    else
-                    {
-                        <div class="section-state neutral">Проверка ещё не выполнялась</div>
-                    }
-                </div>
+                        <div class="mb-3">
+                            <span class="badge bg-primary-subtle text-primary rounded-pill px-3 py-2">
+                                @Model.ForecastLevel
+                            </span>
+                        </div>
 
-                @if (!string.IsNullOrWhiteSpace(Model.StyleAssessment))
-                {
-                    var badgeClass = Model.StyleAssessment.ToLower() switch
-                    {
-                        "соответствует" => "status-chip success",
-                        "частично соответствует" => "status-chip warning",
-                        "не соответствует" => "status-chip danger",
-                        _ => "status-chip neutral"
-                    };
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <div class="mini-metric-card">
+                                    <div class="text-muted small">Качество</div>
+                                    <div class="fw-bold">@Model.ForecastQualityScore</div>
+                                </div>
+                            </div>
 
-                    <span class="@badgeClass">@Model.StyleAssessment</span>
-                }
-            </div>
+                            <div class="col-6">
+                                <div class="mini-metric-card">
+                                    <div class="text-muted small">ER</div>
+                                    <div class="fw-bold">@Model.ForecastERPercent.ToString("F1")%</div>
+                                </div>
+                            </div>
 
-            @if (Model.StyleCheckedAt != null)
-            {
-                @if (!string.IsNullOrWhiteSpace(Model.StyleSummary))
-                {
-                    <div class="summary-panel mb-4">
-                        <div class="fw-semibold mb-2">Общий вывод</div>
-                        <div>@Model.StyleSummary</div>
-                    </div>
-                }
+                            <div class="col-6">
+                                <div class="mini-metric-card">
+                                    <div class="text-muted small">Лайки</div>
+                                    <div class="fw-bold">@Model.ForecastLikes</div>
+                                </div>
+                            </div>
 
-                <div class="row g-3">
-                    <div class="col-lg-6">
-                        <div class="inner-card h-100">
-                            <h5 class="mb-3">Сильные стороны</h5>
-                            @if (Model.StyleStrengths.Any())
-                            {
-                                <ul class="mb-0 ps-3">
-                                    @foreach (var item in Model.StyleStrengths)
-                                    {
-                                        <li class="mb-2">@item</li>
-                                    }
-                                </ul>
-                            }
-                            else
-                            {
-                                <p class="text-muted mb-0">Сильные стороны не выделены.</p>
-                            }
+                            <div class="col-6">
+                                <div class="mini-metric-card">
+                                    <div class="text-muted small">Просмотры</div>
+                                    <div class="fw-bold">@Model.ForecastViews</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-
-                    <div class="col-lg-6">
-                        <div class="inner-card h-100">
-                            <h5 class="mb-3">Что можно улучшить</h5>
-                            @if (Model.StyleIssues.Any())
-                            {
-                                <ul class="mb-0 ps-3">
-                                    @foreach (var item in Model.StyleIssues)
-                                    {
-                                        <li class="mb-2">@item</li>
-                                    }
-                                </ul>
-                            }
-                            else
-                            {
-                                <p class="text-muted mb-0">Явных проблем не найдено.</p>
-                            }
-                        </div>
-                    </div>
-
-                    <div class="col-12">
-                        <div class="inner-card">
-                            <h5 class="mb-3">Рекомендации</h5>
-                            @if (Model.StyleRecommendations.Any())
-                            {
-                                <ol class="mb-0 ps-3">
-                                    @foreach (var item in Model.StyleRecommendations)
-                                    {
-                                        <li class="mb-2">@item</li>
-                                    }
-                                </ol>
-                            }
-                            else
-                            {
-                                <p class="text-muted mb-0">Рекомендации не были сформированы.</p>
-                            }
-                        </div>
-                    </div>
-                </div>
-            }
-        </div>
-    </div>
-
-    <div class="app-card">
-        <div class="app-card-body">
-            <div class="details-section-head mb-3">
-                <div>
-                    <h3 class="section-card-title mb-1">Проверка регламентов</h3>
-                    @if (Model.RegulationCheckedAt != null)
-                    {
-                        <div class="section-state success">Проверка выполнена</div>
-                        <div class="section-time">@Model.RegulationCheckedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
-                    }
-                    else
-                    {
-                        <div class="section-state neutral">Проверка ещё не выполнялась</div>
-                    }
-                </div>
-            </div>
-
-            @if (Model.RegulationCheckedAt != null)
-            {
-                <div class="mb-3">
-                    <strong>Статус:</strong>
-                    @(Model.HasRegulationViolations == true ? "Есть нарушения" : "Нарушений не найдено")
-                </div>
-
-                @if (!string.IsNullOrWhiteSpace(Model.RegulationComment))
-                {
-                    <div class="summary-panel mb-4">
-                        @Model.RegulationComment
-                    </div>
                 }
 
-                @if (Model.RegulationViolations.Any())
+                @if (Model.RecommendationsCheckedAt.HasValue)
                 {
-                    <div class="row g-3">
-                        @foreach (var match in Model.RegulationViolations)
+                    <div class="check-summary-card">
+                        <h5 class="mb-3">Рекомендации</h5>
+
+                        @if (Model.RecommendationsText != null && Model.RecommendationsText.Any())
                         {
-                            <div class="col-12 col-xl-6">
-                                <div class="inner-card h-100">
-                                    <div><strong>Тема:</strong> @match.RuleShort</div>
-
-                                    @if (!string.IsNullOrWhiteSpace(match.MatchedText))
+                            <div class="mb-3">
+                                <div class="fw-semibold mb-2">Правки текста</div>
+                                <ul class="mb-0 ps-3">
+                                    @foreach (var item in Model.RecommendationsText.Take(3))
                                     {
-                                        <div><strong>Фрагмент:</strong> @match.MatchedText</div>
+                                        <li class="mb-2">@item</li>
                                     }
+                                </ul>
+                            </div>
+                        }
 
-                                    @if (!string.IsNullOrWhiteSpace(match.Explanation))
+                        @if (Model.RecommendationsTopics != null && Model.RecommendationsTopics.Any())
+                        {
+                            <div class="mb-3">
+                                <div class="fw-semibold mb-2">Темы</div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    @foreach (var topic in Model.RecommendationsTopics.Take(3))
                                     {
-                                        <div><strong>Пояснение:</strong> @match.Explanation</div>
+                                        <span class="badge bg-light text-dark border recommendation-topic-badge">@topic</span>
                                     }
                                 </div>
                             </div>
                         }
+
+                        @if (!string.IsNullOrWhiteSpace(Model.RecommendationsAdvice))
+                        {
+                            <div class="p-3 bg-light rounded-4 recommendation-advice">
+                                @Model.RecommendationsAdvice
+                            </div>
+                        }
                     </div>
                 }
-                else
-                {
-                    <div class="empty-state">Совпадений с нарушениями не найдено.</div>
-                }
-            }
-        </div>
-    </div>
-
-    <div class="app-card">
-        <div class="app-card-body">
-            <div class="details-section-head mb-3">
-                <div>
-                    <h3 class="section-card-title mb-1">Прогноз вовлеченности</h3>
-                    @if (Model.ForecastCheckedAt != null)
-                    {
-                        <div class="section-state success">Прогноз сформирован</div>
-                        <div class="section-time">@Model.ForecastCheckedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
-                    }
-                    else
-                    {
-                        <div class="section-state neutral">Прогноз ещё не рассчитывался</div>
-                    }
-                </div>
             </div>
-
-            @if (Model.ForecastCheckedAt != null)
-            {
-                <div class="d-flex flex-column gap-3">
-                    <div class="summary-panel">
-                        <div class="fw-semibold mb-2">Уровень вовлеченности</div>
-                        <div>@Model.ForecastLevel</div>
-                    </div>
-                    <div class="mb-3">
-                        <div class="fw-semibold mb-2">Качество контента</div>
-                        <div class="d-flex align-items-center gap-2">
-                            <div class="progress flex-grow-1" style="height: 8px;">
-                                @{
-                                    var progressClass = Model.ForecastQualityScore switch
-                                    {
-                                        >= 80 => "bg-success",
-                                        >= 60 => "bg-primary",
-                                        >= 40 => "bg-warning",
-                                        _ => "bg-danger"
-                                    };
-                                }
-                                <div class="progress-bar @progressClass" role="progressbar"
-                                     style="width: @Model.ForecastQualityScore%"
-                                     aria-valuenow="@Model.ForecastQualityScore" aria-valuemin="0" aria-valuemax="100">
-                                </div>
-                            </div>
-                            <span class="fw-bold">@Model.ForecastQualityScore/100</span>
-                        </div>
-                    </div>
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <div class="inner-card text-center">
-                                <div class="text-muted small">Ожидаемые лайки</div>
-                                <div class="fw-bold fs-5">👍 @Model.ForecastLikes</div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="inner-card text-center">
-                                <div class="text-muted small">Комментарии</div>
-                                <div class="fw-bold fs-5">💬 @Model.ForecastComments</div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="inner-card text-center">
-                                <div class="text-muted small">ER</div>
-                                <div class="fw-bold fs-5">@Model.ForecastERPercent%</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            }
         </div>
     </div>
-
-    <div class="app-card">
-        <div class="app-card-body">
-            <div class="details-section-head mb-3">
-                <div>
-                    <h3 class="section-card-title mb-1">Рекомендации</h3>
-                    @if (Model.RecommendationsCheckedAt != null)
-                    {
-                        <div class="section-state success">Рекомендации сформированы</div>
-                        <div class="section-time">@Model.RecommendationsCheckedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
-                    }
-                    else
-                    {
-                        <div class="section-state neutral">Рекомендации ещё не сформированы</div>
-                    }
-                </div>
-            </div>
-
-            @if (Model.RecommendationsCheckedAt != null)
-            {
-                <div class="row g-3">
-                    <div class="col-lg-6">
-                        <div class="inner-card h-100">
-                            <h5 class="mb-3">Правки текста</h5>
-                            @if (Model.RecommendationsText.Any())
-                            {
-                                <ul class="mb-0 ps-3">@foreach(var i in Model.RecommendationsText){<li class="mb-2">@i</li>}</ul>
-                            }
-                            else
-                            {
-
-                                <p class="text-muted mb-0">Не выделено.</p>
-                            }
-                        </div>
-                    </div>
-                    <div class="col-lg-6">
-                        <div class="inner-card h-100">
-                            <h5 class="mb-3">Структурные изменения</h5>
-                            @if (Model.RecommendationsStruct.Any())
-                            {
-                                <ul class="mb-0 ps-3">@foreach(var i in Model.RecommendationsStruct){<li class="mb-2">@i</li>}</ul>
-                            }
-                            else
-                            {
-                                <p class="text-muted mb-0">Не выделено.</p>
-                            }
-                        </div>
-                    </div>
-                    <div class="col-12">
-                        <div class="inner-card">
-                            <h5 class="mb-3">Общий совет</h5>
-                            <div>@Model.RecommendationsAdvice</div>
-                        </div>
-                    </div>
-                </div>
-            }
-        </div>
-    </div>
-
 </div>
+
+@section Scripts {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+
+            tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+                new bootstrap.Tooltip(tooltipTriggerEl, {
+                    trigger: "hover focus",
+                    container: "body"
+                });
+            });
+        });
+    </script>
+}

@@ -1088,3 +1088,313 @@ button[disabled] {
         grid-template-columns: 1fr;
     }
 }
+
+
+.post-text-box {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    padding: 26px;
+    line-height: 1.85;
+    font-size: 16px;
+    min-height: 220px;
+}
+
+.text-error-highlight {
+    color: #e85d04;
+    border-bottom: 2px wavy #ff7a00;
+    cursor: help;
+    padding: 1px 2px;
+    border-radius: 4px;
+}
+
+    .text-error-highlight:hover {
+        background: #fff3e6;
+    }
+
+.text-warning-highlight {
+    color: #b7791f;
+    border-bottom: 2px dotted #f6ad55;
+    cursor: help;
+    padding: 1px 2px;
+    border-radius: 4px;
+}
+
+    .text-warning-highlight:hover {
+        background: #fffaf0;
+    }
+
+.text-regulation-highlight {
+    color: #dc2626;
+    border-bottom: 2px wavy #ef4444;
+    cursor: help;
+    padding: 1px 2px;
+    border-radius: 4px;
+}
+
+    .text-regulation-highlight:hover {
+        background: #fee2e2;
+    }
+
+.check-summary-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    padding: 18px;
+    background: #ffffff;
+}
+
+.check-status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.status-success {
+    background: #22c55e;
+}
+
+.status-warning {
+    background: #f59e0b;
+}
+
+.status-muted {
+    background: #9ca3af;
+}
+
+.status-danger {
+    background: #ef4444;
+}
+
+.mini-metric-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 12px;
+    background: #f9fafb;
+}
+
+.check-summary-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    padding: 18px;
+    background: #ffffff;
+    overflow: hidden;
+}
+
+    .check-summary-card,
+    .check-summary-card * {
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+        .check-summary-card ul {
+            padding-left: 18px;
+        }
+
+        .check-summary-card li {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+.recommendation-topic-badge {
+    display: inline-block;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    text-align: left;
+    line-height: 1.35;
+    padding: 6px 8px;
+}
+
+.recommendation-advice {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.55;
+}
+
+.details-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.details-page-title {
+    font-size: 30px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #0f172a;
+}
+
+.details-page-meta {
+    color: #64748b;
+    font-size: 15px;
+}
+
+.details-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+    .details-actions form {
+        margin: 0;
+    }
+
+.details-action-btn {
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 16px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+    transition: 0.18s ease;
+    white-space: nowrap;
+    background: #ffffff;
+}
+
+    .details-action-btn:hover {
+        transform: translateY(-1px);
+        text-decoration: none;
+    }
+
+.details-action-icon {
+    line-height: 1;
+}
+
+.details-action-edit {
+    background: linear-gradient(135deg, #ff9f1c, #ffb703);
+    color: #ffffff;
+    box-shadow: 0 8px 18px rgba(255, 159, 28, 0.25);
+}
+
+    .details-action-edit:hover {
+        color: #ffffff;
+        box-shadow: 0 10px 22px rgba(255, 159, 28, 0.32);
+    }
+
+.details-action-back {
+    background: #ffffff;
+    color: #334155;
+    border-color: #dbe3ef;
+}
+
+    .details-action-back:hover {
+        color: #0f172a;
+        background: #f8fafc;
+        border-color: #cbd5e1;
+    }
+
+.details-action-delete {
+    color: #dc2626;
+    border-color: #fecaca;
+    background: #fffafa;
+}
+
+    .details-action-delete:hover {
+        color: #b91c1c;
+        background: #fef2f2;
+        border-color: #fca5a5;
+    }
+
+.post-check-panel {
+    margin-top: 18px;
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    background: #f8fafc;
+}
+
+.post-check-panel-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #475569;
+    margin-bottom: 12px;
+}
+
+.post-check-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.post-check-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 38px;
+    padding: 8px 13px;
+    border-radius: 12px;
+    border: 1px solid #bfdbfe;
+    background: #ffffff;
+    color: #2563eb;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: 0.18s ease;
+}
+
+    .post-check-btn:hover {
+        color: #1d4ed8;
+        background: #eff6ff;
+        border-color: #93c5fd;
+        text-decoration: none;
+        transform: translateY(-1px);
+    }
+
+@media (max-width: 768px) {
+    .details-page-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .details-actions {
+        justify-content: flex-start;
+    }
+
+    .details-action-btn {
+        flex: 1 1 auto;
+    }
+
+    .post-check-btn {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
+}
+
+.post-error-tooltip .tooltip-inner {
+    max-width: 360px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: #111827;
+    color: #ffffff;
+    font-size: 14px;
+    line-height: 1.45;
+    text-align: left;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.25);
+}
+
+.post-error-tooltip.bs-tooltip-top .tooltip-arrow::before {
+    border-top-color: #111827;
+}
+
+.post-error-tooltip.bs-tooltip-bottom .tooltip-arrow::before {
+    border-bottom-color: #111827;
+}
+
+.post-error-tooltip.bs-tooltip-start .tooltip-arrow::before {
+    border-left-color: #111827;
+}
+
+.post-error-tooltip.bs-tooltip-end .tooltip-arrow::before {
+    border-right-color: #111827;
+}

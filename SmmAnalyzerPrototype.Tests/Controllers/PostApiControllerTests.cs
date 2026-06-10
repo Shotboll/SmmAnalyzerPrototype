@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using SmmAnalyzerPrototype.Api.Controllers;
 using SmmAnalyzerPrototype.Data.Data;
+using SmmAnalyzerPrototype.Data.Enums;
 using SmmAnalyzerPrototype.Data.Models;
 using SmmAnalyzerPrototype.Data.Models.DTO.Post;
 
@@ -254,7 +255,7 @@ namespace SmmAnalyzerPrototype.Tests.Controllers
                 Community = currentCommunity,
                 Text = "Мой пост",
                 CreatedAt = DateTime.UtcNow.AddMinutes(-1),
-                Status = "Draft"
+                Status = PostStatus.Draft,
             };
 
             var otherPost = new Post
@@ -264,7 +265,7 @@ namespace SmmAnalyzerPrototype.Tests.Controllers
                 Community = otherCommunity,
                 Text = "Чужой пост",
                 CreatedAt = DateTime.UtcNow,
-                Status = "Draft"
+                Status = PostStatus.Draft,
             };
 
             context.Communities.AddRange(currentCommunity, otherCommunity);
@@ -305,7 +306,7 @@ namespace SmmAnalyzerPrototype.Tests.Controllers
                 Community = community,
                 Text = "Текст публикации",
                 CreatedAt = DateTime.UtcNow,
-                Status = "Draft"
+                Status = PostStatus.Draft,
             };
 
             context.Communities.Add(community);
@@ -347,7 +348,7 @@ namespace SmmAnalyzerPrototype.Tests.Controllers
                 Community = otherCommunity,
                 Text = "Чужой пост",
                 CreatedAt = DateTime.UtcNow,
-                Status = "Draft"
+                Status = PostStatus.Draft,
             };
 
             context.Communities.Add(otherCommunity);
@@ -395,12 +396,12 @@ namespace SmmAnalyzerPrototype.Tests.Controllers
             dto.Text.Should().Be("Новый текст публикации");
             dto.CommunityId.Should().Be(community.Id);
             dto.CommunityName.Should().Be("Мое сообщество");
-            dto.Status.Should().Be("Draft");
+            dto.Status.Should().Be(PostStatus.Draft);
 
             var savedPost = await context.Posts.SingleAsync();
             savedPost.Text.Should().Be("Новый текст публикации");
             savedPost.CommunityId.Should().Be(community.Id);
-            savedPost.Status.Should().Be("Draft");
+            savedPost.Status.Should().Be(PostStatus.Draft);
 
             var analysisResult = await context.AnalysisResults.SingleAsync();
             analysisResult.PostId.Should().Be(savedPost.Id);
@@ -506,7 +507,7 @@ namespace SmmAnalyzerPrototype.Tests.Controllers
                 Community = community,
                 Text = "Старый текст",
                 CreatedAt = DateTime.UtcNow,
-                Status = "Analyzed"
+                Status = PostStatus.Analyzed
             };
 
             var analysis = new AnalysisResult
@@ -567,7 +568,7 @@ namespace SmmAnalyzerPrototype.Tests.Controllers
                 .SingleAsync(x => x.Id == post.Id);
 
             updatedPost.Text.Should().Be("Новый текст");
-            updatedPost.Status.Should().Be("Draft");
+            updatedPost.Status.Should().Be(PostStatus.Draft);
             updatedPost.UpdatedAt.Should().NotBeNull();
 
             updatedPost.AnalysisResult.Should().NotBeNull();
@@ -619,7 +620,7 @@ namespace SmmAnalyzerPrototype.Tests.Controllers
                 Community = otherCommunity,
                 Text = "Чужой текст",
                 CreatedAt = DateTime.UtcNow,
-                Status = "Draft"
+                Status = PostStatus.Draft
             };
 
             context.Communities.AddRange(currentCommunity, otherCommunity);
