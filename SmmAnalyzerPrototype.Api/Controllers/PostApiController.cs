@@ -317,50 +317,54 @@ namespace SmmAnalyzerPrototype.Api.Controllers
             if (post == null)
                 return NotFound("Пост не найден.");
 
-            var textChanged = post.Text.Trim() != request.Text.Trim();
+            var newText = request.Text.Trim();
+            var textChanged = post.Text.Trim() != newText;
             var communityChanged = post.CommunityId != request.CommunityId;
 
-            post.Text = request.Text.Trim();
+            post.Text = newText;
             post.CommunityId = request.CommunityId;
             post.UpdatedAt = DateTime.UtcNow;
 
             if (textChanged || communityChanged)
             {
-                post.Status = PostStatus.Draft;
-
-                if (post.AnalysisResult != null)
+                if (post.AnalysisResult == null)
                 {
-                    var grammarErrors = await _context.GrammarErrors
-                        .Where(x => x.AnalysisResultId == post.AnalysisResult.PostId)
-                        .ToListAsync();
+                    post.AnalysisResult = new AnalysisResult
+                    {
+                        PostId = post.Id,
+                        UpdatedAt = DateTime.UtcNow
+                    };
 
-                    var prohibitedMatches = await _context.ProhibitedTopicMatches
-                        .Where(x => x.AnalysisResultId == post.AnalysisResult.PostId)
-                        .ToListAsync();
-
-                    _context.GrammarErrors.RemoveRange(grammarErrors);
-                    _context.ProhibitedTopicMatches.RemoveRange(prohibitedMatches);
-
-                    post.AnalysisResult.GrammarCheckedAt = null;
-                    post.AnalysisResult.StyleCheckedAt = null;
-                    post.AnalysisResult.RegulationCheckedAt = null;
-                    post.AnalysisResult.ForecastCheckedAt = null;
-                    post.AnalysisResult.RecommendationsCheckedAt = null;
-
-                    post.AnalysisResult.StyleAssessment = null;
-                    post.AnalysisResult.StyleSummary = null;
-                    post.AnalysisResult.StyleStrengthsJson = null;
-                    post.AnalysisResult.StyleIssuesJson = null;
-                    post.AnalysisResult.StyleRecommendationsJson = null;
-
-                    post.AnalysisResult.HasRegulationViolations = null;
-                    post.AnalysisResult.RegulationComment = null;
-
-                    post.AnalysisResult.EngagementForecastJson = null;
-                    post.AnalysisResult.RecommendationsJson = null;
-
-                    post.AnalysisResult.UpdatedAt = DateTime.UtcNow;
+                    _context.AnalysisResults.Add(post.AnalysisResult);
                 }
+
+                var prohibitedMatches = await _context.ProhibitedTopicMatches
+                    .Where(x => x.AnalysisResultId == post.AnalysisResult.PostId)
+                    .ToListAsync();
+
+                _context.ProhibitedTopicMatches.RemoveRange(prohibitedMatches);
+
+                post.AnalysisResult.GrammarCheckedAt = null;
+                post.AnalysisResult.StyleCheckedAt = null;
+                post.AnalysisResult.RegulationCheckedAt = null;
+                post.AnalysisResult.ForecastCheckedAt = null;
+                post.AnalysisResult.RecommendationsCheckedAt = null;
+
+                post.AnalysisResult.StyleAssessment = null;
+                post.AnalysisResult.StyleSummary = null;
+                post.AnalysisResult.StyleStrengthsJson = null;
+                post.AnalysisResult.StyleIssuesJson = null;
+                post.AnalysisResult.StyleRecommendationsJson = null;
+
+                post.AnalysisResult.HasRegulationViolations = null;
+                post.AnalysisResult.RegulationComment = null;
+                post.AnalysisResult.EngagementForecastJson = null;
+                post.AnalysisResult.RecommendationsJson = null;
+                post.AnalysisResult.UpdatedAt = DateTime.UtcNow;
+
+                await CheckGrammarForPostAsync(post, post.AnalysisResult);
+
+                post.Status = CalculatePostStatus(post.AnalysisResult);
             }
 
             await _context.SaveChangesAsync();

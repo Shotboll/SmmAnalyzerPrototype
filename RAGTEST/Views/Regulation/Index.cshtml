@@ -5,72 +5,85 @@
     ViewData["Title"] = "Регламенты";
 }
 
-<div class="page-toolbar">
-    <div class="page-header mb-0">
-        <h1 class="page-title">Регламенты</h1>
-        <p class="page-subtitle">Правила и ограничения, которые используются в проверке публикаций.</p>
-    </div>
-
-    <a asp-action="Create" class="btn btn-primary">Создать регламент</a>
-</div>
-
-@if (!Model.Any())
-{
-    <div class="app-card">
-        <div class="app-card-body">
-            <div class="empty-state">
-                Пока не создано ни одного регламента.
-            </div>
+<div class="regulations-list-page">
+    <div class="regulations-list-header">
+        <div>
+            <h1 class="regulations-list-title">Регламенты</h1>
+            <p class="regulations-list-subtitle">Правила и ограничения, которые используются при проверке публикаций.</p>
         </div>
+
+        <a asp-action="Create" class="regulations-list-create-btn">
+            <span>＋</span>
+            <span>Создать регламент</span>
+        </a>
     </div>
-}
-else
-{
-    <div class="app-card table-card">
-        <div class="table-responsive">
-            <table class="table align-middle">
-                <thead>
-                    <tr>
-                        <th>Регламент</th>
-                        <th>Категория</th>
-                        <th>Сообщество</th>
-                        <th style="width: 180px;"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var item in Model)
-                    {
-                        <tr>
-                            <td>
-                                <div class="cell-title">@item.Title</div>
-                            </td>
-                            <td>
-                                @if (!string.IsNullOrWhiteSpace(item.Category))
+
+    @if (!Model.Any())
+    {
+        <div class="regulations-list-empty">
+            <div class="regulations-list-empty-icon">📄</div>
+            <h3>Регламентов пока нет</h3>
+            <p>Создайте первый регламент, чтобы система могла проверять публикации на соответствие правилам сообщества.</p>
+
+            <a asp-action="Create" class="regulations-list-create-btn">
+                <span>＋</span>
+                <span>Создать регламент</span>
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="regulations-list">
+            @foreach (var item in Model)
+            {
+                <div class="regulation-list-item">
+                    <div class="regulation-list-main">
+                        <div class="regulation-list-icon">
+                            📄
+                        </div>
+
+                        <div class="regulation-list-content">
+                            <div class="regulation-list-top">
+                                <h2 class="regulation-list-name">@item.Title</h2>
+
+                                @if (!string.IsNullOrWhiteSpace(item.CommunityName))
                                 {
-                                    <span class="status-chip neutral">@item.Category</span>
+                                    <span class="regulation-list-community">@item.CommunityName</span>
                                 }
                                 else
                                 {
-                                    <span class="status-chip neutral">Без категории</span>
+                                    <span class="regulation-list-muted-chip">Сообщество не указано</span>
                                 }
-                            </td>
-                            <td>
-                                <div class="cell-subtitle">@item.CommunityName</div>
-                            </td>
-                            <td>
-                                <div class="table-actions">
-                                    <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-warning">
-                                        Редактировать
-                                    </a>
-                                    <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-danger">
-                                        Удалить
-                                    </a>
+                            </div>
+
+                            <div class="regulation-list-meta">
+                                @if (!string.IsNullOrWhiteSpace(item.Category))
+                                {
+                                    <div>
+                                        <span class="regulation-list-label">Категория:</span>
+                                        <span>@item.Category</span>
+                                    </div>
+                                }
+
+                                <div>
+                                    <span class="regulation-list-label">Используется:</span>
+                                    <span>при проверке публикаций по регламентам</span>
                                 </div>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="regulation-list-actions">
+                        <a asp-action="Edit" asp-route-id="@item.Id" class="regulation-list-btn regulation-list-edit">
+                            Редактировать
+                        </a>
+
+                        <a asp-action="Delete" asp-route-id="@item.Id" class="regulation-list-btn regulation-list-delete">
+                            Удалить
+                        </a>
+                    </div>
+                </div>
+            }
         </div>
-    </div>
-}
+    }
+</div>

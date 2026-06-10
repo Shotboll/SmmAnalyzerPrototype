@@ -5,79 +5,120 @@
     ViewData["Title"] = "Сообщества";
 }
 
-<div class="page-toolbar">
-    <div class="page-header mb-0">
-        <h1 class="page-title">Сообщества</h1>
-        <p class="page-subtitle">Управление сообществами, их аудиторией и стилем коммуникации.</p>
-    </div>
-
-    <a asp-action="Create" class="btn btn-primary">Создать сообщество</a>
-</div>
-
-@if (!Model.Any())
-{
-    <div class="app-card">
-        <div class="app-card-body">
-            <div class="empty-state">
-                Пока не создано ни одного сообщества.
-            </div>
+<div class="communities-list-page">
+    <div class="communities-list-header">
+        <div>
+            <h1 class="communities-list-title">Сообщества</h1>
+            <p class="communities-list-subtitle">Управление аудиторией, стилем общения и подключением к VK.</p>
         </div>
+
+        <a asp-action="Create" class="communities-list-create-btn">
+            <span>＋</span>
+            <span>Создать сообщество</span>
+        </a>
     </div>
-}
-else
-{
-    <div class="app-card table-card">
-        <div class="table-responsive">
-            <table class="table align-middle">
-                <thead>
-                    <tr>
-                        <th>Сообщество</th>
-                        <th>Целевая аудитория</th>
-                        <th>Стиль общения</th>
-                        <th style="width: 180px;"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var item in Model)
-                    {
-                        <tr>
-                            <td>
-                                <div class="cell-title">@item.Name</div>
-                            </td>
-                            <td>
-                                @if (!string.IsNullOrWhiteSpace(item.TargetAudience))
-                                {
-                                    <div class="cell-subtitle">@item.TargetAudience</div>
-                                }
-                                else
-                                {
-                                    <span class="status-chip neutral">Не указана</span>
-                                }
-                            </td>
-                            <td>
+
+    @if (!Model.Any())
+    {
+        <div class="communities-list-empty">
+            <div class="communities-list-empty-icon">👥</div>
+            <h3>Сообществ пока нет</h3>
+            <p>Создайте первое сообщество, чтобы задавать аудиторию, стиль общения и анализировать публикации.</p>
+
+            <a asp-action="Create" class="communities-list-create-btn">
+                <span>＋</span>
+                <span>Создать сообщество</span>
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="communities-list">
+            @foreach (var item in Model)
+            {
+                <div class="community-list-item">
+                    <div class="community-list-main">
+                        <div class="community-list-avatar">
+                            @GetCommunityInitials(item.Name)
+                        </div>
+
+                        <div class="community-list-content">
+                            <div class="community-list-top">
+                                <h2 class="community-list-name">@item.Name</h2>
+
                                 @if (!string.IsNullOrWhiteSpace(item.StyleProfile))
                                 {
-                                    <div class="cell-subtitle">@item.StyleProfile</div>
+                                    <span class="community-list-style">@item.StyleProfile</span>
                                 }
                                 else
                                 {
-                                    <span class="status-chip neutral">Не указан</span>
+                                    <span class="community-list-muted-chip">Стиль не указан</span>
                                 }
-                            </td>
-                            <td>
-                                <div class="table-actions">
-                                    <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-warning">
-                                        Редактировать
-                                    </a>
-                                    <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-danger">
-                                        Удалить
-                                    </a>
+                            </div>
+
+                            <div class="community-list-meta">
+                                <div>
+                                    <span class="community-list-label">Аудитория:</span>
+                                    @if (!string.IsNullOrWhiteSpace(item.TargetAudience))
+                                    {
+                                        <span>@item.TargetAudience</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">не указана</span>
+                                    }
                                 </div>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+
+                                <div>
+                                    <span class="community-list-label">VK:</span>
+                                    @if (!string.IsNullOrWhiteSpace(item.VkUrl))
+                                    {
+                                        <a href="@item.VkUrl" target="_blank" class="community-list-vk">
+                                            @(!string.IsNullOrWhiteSpace(item.VkScreenName) ? item.VkScreenName : item.VkUrl)
+                                        </a>
+                                    }
+                                    else if (!string.IsNullOrWhiteSpace(item.VkInput))
+                                    {
+                                        <span>@item.VkInput</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">не подключён</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="community-list-actions">
+                        <a asp-action="Edit" asp-route-id="@item.Id" class="community-list-btn community-list-edit">
+                            Редактировать
+                        </a>
+
+                        <a asp-action="Delete" asp-route-id="@item.Id" class="community-list-btn community-list-delete">
+                            Удалить
+                        </a>
+                    </div>
+                </div>
+            }
         </div>
-    </div>
+    }
+</div>
+
+@functions {
+    private string GetCommunityInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return "С";
+
+        var words = name
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Take(2)
+            .ToList();
+
+        if (words.Count == 0)
+            return "С";
+
+        return string.Join("", words.Select(x => x[0])).ToUpperInvariant();
+    }
 }

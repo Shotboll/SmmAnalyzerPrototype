@@ -4,94 +4,132 @@
     ViewData["Title"] = "Посты";
 }
 
-<div class="page-toolbar">
-    <div class="page-header mb-0">
-        <h1 class="page-title">Посты</h1>
-        <p class="page-subtitle">Список сохранённых постов и статус выполненных проверок.</p>
-    </div>
-
-    <a asp-action="Create" class="btn btn-primary">Создать пост</a>
-</div>
-
-@if (!Model.Any())
-{
-    <div class="app-card">
-        <div class="app-card-body">
-            <div class="empty-state">
-                Постов пока нет. Создайте первую публикацию, чтобы начать анализ.
-            </div>
+<div class="posts-page">
+    <div class="posts-page-header">
+        <div>
+            <h1 class="posts-page-title">Посты</h1>
+            <p class="posts-page-subtitle">Список сохранённых публикаций и состояние выполненных проверок.</p>
         </div>
+
+        <a asp-action="Create" class="posts-create-btn">
+            <span>＋</span>
+            <span>Создать пост</span>
+        </a>
     </div>
-}
-else
-{
-    <div class="app-card table-card">
-        <div class="table-responsive">
-            <table class="table align-middle">
-                <thead>
-                    <tr>
-                        <th>Дата</th>
-                        <th>Сообщество</th>
-                        <th>Текст</th>
-                        <th>Статус</th>
-                        <th>Проверки</th>
-                        <th style="width: 140px;"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var post in Model)
-                    {
-                        <tr>
-                            <td>
-                                <div class="cell-title">@post.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</div>
-                                <div class="cell-subtitle">@post.CreatedAt.ToLocalTime().ToString("HH:mm")</div>
-                            </td>
 
-                            <td>
-                                <div class="cell-title">@post.CommunityName</div>
-                            </td>
+    @if (!Model.Any())
+    {
+        <div class="posts-empty-card">
+            <div class="posts-empty-icon">📝</div>
+            <h3>Постов пока нет</h3>
+            <p>Создайте первую публикацию, чтобы запустить проверку текста и анализ контента.</p>
 
-                            <td>
-                                <div class="cell-subtitle text-truncate-soft">@post.TextPreview</div>
-                            </td>
+            <a asp-action="Create" class="posts-create-btn">
+                <span>＋</span>
+                <span>Создать пост</span>
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="posts-list">
+            @foreach (var post in Model)
+            {
+                var checksCount = 0;
 
-                            <td>
-                                <span class="status-chip neutral">
+                if (post.GrammarChecked) checksCount++;
+                if (post.StyleChecked) checksCount++;
+                if (post.RegulationChecked) checksCount++;
+                if (post.ForecastChecked) checksCount++;
+                if (post.RecommendationsChecked) checksCount++;
+
+                var progressPercent = checksCount * 20;
+
+                <article class="post-list-card">
+                    <div class="post-list-main">
+                        <div class="post-date-box">
+                            <div class="post-date-day">@post.CreatedAt.ToLocalTime().ToString("dd.MM")</div>
+                            <div class="post-date-year">@post.CreatedAt.ToLocalTime().ToString("yyyy")</div>
+                            <div class="post-date-time">@post.CreatedAt.ToLocalTime().ToString("HH:mm")</div>
+                        </div>
+
+                        <div class="post-list-content">
+                            <div class="post-card-topline">
+                                <span class="post-community">@post.CommunityName</span>
+                                <span class="post-status-chip @GetStatusCssClass(post.StatusText)">
                                     @(string.IsNullOrWhiteSpace(post.StatusText) ? "Без статуса" : post.StatusText)
                                 </span>
-                            </td>
+                            </div>
 
-                            <td>
-                                <div class="d-flex flex-column gap-2">
-                                    <span class="mini-check @(post.GrammarChecked ? "done" : "pending")">
-                                        Ошибки: @(post.GrammarChecked ? "выполнено" : "нет")
-                                    </span>
-                                    <span class="mini-check @(post.StyleChecked ? "done" : "pending")">
-                                        Стиль: @(post.StyleChecked ? "выполнено" : "нет")
-                                    </span>
-                                    <span class="mini-check @(post.RegulationChecked ? "done" : "pending")">
-                                        Регламенты: @(post.RegulationChecked ? "выполнено" : "нет")
-                                    </span>
-                                    <span class="mini-check @(post.ForecastChecked ? "done" : "pending")">
-                                        Прогноз: @(post.ForecastChecked ? "выполнено" : "нет")
-                                    </span>
-                                    <span class="mini-check @(post.RecommendationsChecked ? "done" : "pending")">
-                                        Рекомендации: @(post.RecommendationsChecked ? "выполнено" : "нет")
-                                    </span>
-                                </div>
-                            </td>
+                            <div class="post-preview-text">
+                                @post.TextPreview
+                            </div>
 
-                            <td>
-                                <div class="table-actions">
-                                    <a asp-action="Details" asp-route-id="@post.Id" class="btn btn-sm btn-outline-primary">
-                                        Открыть
-                                    </a>
+                            <div class="post-progress-row">
+                                <div class="post-progress-info">
+                                    Проверки: <strong>@checksCount из 5</strong>
                                 </div>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+
+                                <div class="post-progress">
+                                    <div class="post-progress-fill" style="width: @progressPercent%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="post-checks-box">
+                        <div class="post-checks-grid">
+                            <span class="post-check-chip @(post.GrammarChecked ? "done" : "pending")">
+                                <span class="post-check-dot"></span>
+                                Ошибки
+                            </span>
+
+                            <span class="post-check-chip @(post.StyleChecked ? "done" : "pending")">
+                                <span class="post-check-dot"></span>
+                                Стиль
+                            </span>
+
+                            <span class="post-check-chip @(post.RegulationChecked ? "done" : "pending")">
+                                <span class="post-check-dot"></span>
+                                Регламенты
+                            </span>
+
+                            <span class="post-check-chip @(post.ForecastChecked ? "done" : "pending")">
+                                <span class="post-check-dot"></span>
+                                Прогноз
+                            </span>
+
+                            <span class="post-check-chip @(post.RecommendationsChecked ? "done" : "pending")">
+                                <span class="post-check-dot"></span>
+                                Рекомендации
+                            </span>
+                        </div>
+
+                        <a asp-action="Details" asp-route-id="@post.Id" class="post-open-btn">
+                            Открыть
+                        </a>
+                    </div>
+                </article>
+            }
         </div>
-    </div>
+    }
+</div>
+
+@functions {
+    private string GetStatusCssClass(string? statusText)
+    {
+        if (string.IsNullOrWhiteSpace(statusText))
+            return "status-muted";
+
+        if (statusText.Contains("Полностью", StringComparison.OrdinalIgnoreCase))
+            return "status-full";
+
+        if (statusText.Contains("Частично", StringComparison.OrdinalIgnoreCase))
+            return "status-partial";
+
+        if (statusText.Contains("Черновик", StringComparison.OrdinalIgnoreCase))
+            return "status-draft";
+
+        return "status-muted";
+    }
 }
