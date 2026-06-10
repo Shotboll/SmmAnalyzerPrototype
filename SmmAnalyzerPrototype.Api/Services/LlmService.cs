@@ -121,18 +121,28 @@ namespace SmmAnalyzerPrototype.Api.Services
 
             var chunks = await _context.RegulationChunks
                 .FromSqlRaw(@"
-                    SELECT c.*
-                    FROM regulation_chunks c
-                    INNER JOIN regulation_documents d ON c.""RegulationId"" = d.""Id""
-                    WHERE d.""CommunityId"" = {0}
-                    ORDER BY c.embedding <=> {1}::vector
-                    LIMIT {2}
-                ", communityId, normalizedQuery, topK)
+            SELECT c.*
+            FROM regulation_chunks c
+            INNER JOIN regulation_documents d ON c.""RegulationId"" = d.""Id""
+            WHERE d.""CommunityId"" = {0}
+            ORDER BY c.embedding <=> {1}::vector
+            LIMIT {2}
+        ", communityId, normalizedQuery, topK)
                 .Include(x => x.Regulation)
                 .ToListAsync();
 
+            if (!chunks.Any())
+            {
+                return JsonSerializer.Serialize(new AnalyzePostResponse
+                {
+                    HasViolations = false,
+                    Violations = new List<ViolationDto>(),
+                    Comment = "Для выбранного сообщества не найдены регламенты, поэтому проверка по правилам не выполнялась."
+                });
+            }
+
             var contextText = string.Join("\n\n", chunks.Select((x, i) =>
-                $"[ Номер: {i + 1}]\n{x.ChunkText}"
+                $"[Правило {i + 1}]\nНазвание регламента: {x.Regulation?.Title}\nФрагмент правила:\n{x.ChunkText}"
             ));
 
             var prompt = $"""
@@ -155,8 +165,12 @@ namespace SmmAnalyzerPrototype.Api.Services
                 5. Если нарушение нельзя подтвердить точной цитатой из поста и прямой связью с текстом правила — нарушения нет.
                 6. Обычное описание процессов, технологий, тестирования, качества, разработки, публикации, анализа, автоматизации и проверки не является мошенничеством, обманом, манипуляцией или рекламой само по себе.
                 7. Если текст просто описывает рабочий процесс, опыт, технологию или внутреннюю практику, это не нарушение.
-                
-                
+
+                ВАЖНО:
+                - Проверяй пост ТОЛЬКО по правилам, приведенным выше.
+                - Не используй свои собственные правила модерации.
+                - Если в приведенных правилах нет запрета, связанного с текстом поста, верни hasViolations = false.
+                - Не добавляй ничего вне JSON.
 
                 Заполни JSON строго по заданной схеме.
                 """;

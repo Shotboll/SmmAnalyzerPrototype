@@ -278,6 +278,7 @@ namespace RAGTEST.Controllers
                     ExpectedLikes = post.ForecastLikes,
                     ExpectedComments = post.ForecastComments,
                     ExpectedViews = post.ForecastViews,
+                    Confidence = post.ForecastConfidence,
                     ExpectedERPercent = post.ForecastERPercent,
                     Reasoning = post.ForecastReasoning ?? string.Empty,
                     KeyFactors = post.ForecastKeyFactors ?? new List<string>(),

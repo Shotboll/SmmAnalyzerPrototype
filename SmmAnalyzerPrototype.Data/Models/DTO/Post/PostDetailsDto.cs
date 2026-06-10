@@ -30,6 +30,7 @@ namespace SmmAnalyzerPrototype.Data.Models.DTO.Post
         public List<ViolationDto> RegulationViolations { get; set; } = new();
 
         public DateTime? ForecastCheckedAt { get; set; }
+        public double ForecastConfidence { get; set; }
         public DateTime? RecommendationsCheckedAt { get; set; }
         public string? ForecastLevel { get; set; }
         public int ForecastLikes { get; set; }

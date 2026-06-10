@@ -1,160 +1,229 @@
-﻿@model RAGTEST.Models.ForecastPageModel
+﻿@using System.Text.Json
+@model RAGTEST.Models.ForecastPageModel
+
 @{
     ViewData["Title"] = "Прогноз вовлеченности";
+
+    var hasResult = Model.Result != null;
+    var levelText = hasResult && !string.IsNullOrWhiteSpace(Model.Result!.Level)
+        ? NormalizeLevelText(Model.Result.Level)
+        : "Прогноз не выполнен";
+
+    var qualityScore = hasResult ? Model.Result!.QualityScore : 0;
+    var rawConfidence = hasResult ? Model.Result!.Confidence : 0;
+    var confidencePercent = rawConfidence <= 1 ? Math.Round(rawConfidence * 100) : Math.Round(rawConfidence);
+    confidencePercent = Math.Clamp(confidencePercent, 0, 100);
 }
 
-<div class="container py-4">
-    <div class="mb-4">
-        <h1 class="fw-bold mb-2">Прогноз вовлеченности</h1>
-        <p class="text-muted mb-0">Оценка потенциальной реакции аудитории на публикацию.</p>
+<div class="forecast-page">
+    <div class="forecast-header">
+        <div>
+            <h1 class="forecast-title">Прогноз вовлеченности</h1>
+            <p class="forecast-subtitle">
+                Оценка потенциальной реакции аудитории на публикацию с учетом истории сообщества.
+            </p>
+        </div>
+
+        <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="forecast-back-top-btn">
+            ← Назад к посту
+        </a>
     </div>
 
-    <div class="row g-4">
-        <!-- Левая колонка: параметры и форма -->
-        <div class="col-lg-5">
-            <div class="card shadow-sm border-0 rounded-4">
-                <div class="card-body p-4">
-                    <h4 class="card-title mb-4">Параметры анализа</h4>
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger rounded-4 border-0 shadow-sm">
+            @Model.ErrorMessage
+        </div>
+    }
 
-                    <div class="mb-3">
-                        <div class="text-muted small">Сообщество</div>
-                        <div class="fw-semibold">@Model.CommunityName</div>
+    <div class="forecast-layout">
+        <section class="forecast-post-card">
+            <div class="forecast-card-head">
+                <div>
+                    <div class="forecast-label">Сообщество</div>
+                    <div class="forecast-community">@Model.CommunityName</div>
+                </div>
+
+                <span class="forecast-status @GetLevelCssClass(levelText)">
+                    @levelText
+                </span>
+            </div>
+
+            <div class="forecast-label mb-2">Текст поста</div>
+            <div class="forecast-post-text">@Model.Text</div>
+
+            <form asp-action="Forecast" method="post" id="forecastForm" class="forecast-actions">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="postId" value="@Model.PostId" />
+
+                <button type="submit" class="forecast-primary-btn" id="submitBtn">
+                    @(Model.Result != null ? "Сгенерировать заново" : "Сгенерировать прогноз")
+                </button>
+
+                <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="forecast-secondary-btn">
+                    Назад к посту
+                </a>
+            </form>
+        </section>
+
+        <section class="forecast-result-card">
+            <div class="forecast-result-head">
+                <div>
+                    <h2>Результат прогноза</h2>
+                    <p>Предварительная оценка вовлеченности на основе текста и истории публикаций.</p>
+                </div>
+
+                <span class="forecast-result-badge @GetLevelCssClass(levelText)">
+                    @levelText
+                </span>
+            </div>
+
+            @if (Model.Result != null)
+            {
+                <div class="forecast-score-grid">
+                    <div class="forecast-score-card level @GetLevelCssClass(levelText)">
+                        <div class="forecast-score-label">Уровень</div>
+                        <div class="forecast-score-value">@levelText</div>
+                        <div class="forecast-score-text">Общая качественная оценка потенциала публикации.</div>
                     </div>
 
-                    <div class="mb-3">
-                        <div class="text-muted small mb-2">Текст поста</div>
-                        <div class="border rounded-4 p-3 bg-light" style="white-space: pre-wrap;">@Model.Text</div>
-                    </div>
+                    <div class="forecast-score-card">
+                        <div class="forecast-score-label">Качество текста</div>
+                        <div class="forecast-score-value">@qualityScore/100</div>
 
-                    <form asp-action="Forecast" method="post" id="forecastForm">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="postId" value="@Model.PostId" />
-
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg rounded-3" id="submitBtn">
-                                @(Model.Result != null ? "Сгенерировать заново" : "Сгенерировать прогноз")
-                            </button>
+                        <div class="forecast-progress">
+                            <div class="forecast-progress-fill @GetQualityCssClass(qualityScore)" style="width: @Math.Clamp(qualityScore, 0, 100)%;"></div>
                         </div>
-                    </form>
+                    </div>
 
-                    <div class="mt-3">
-                        <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="btn btn-outline-secondary">
-                            Назад к посту
-                        </a>
+                    <div class="forecast-score-card">
+                        <div class="forecast-score-label">Уверенность</div>
+                        <div class="forecast-score-value">@confidencePercent%</div>
+
+                        <div class="forecast-progress">
+                            <div class="forecast-progress-fill" style="width: @Math.Clamp((int)confidencePercent, 0, 100)%;"></div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Правая колонка: результат -->
-        <div class="col-lg-7">
-            <div class="card shadow-sm border-0 rounded-4 h-100">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <h4 class="card-title mb-0">Результат прогноза</h4>
+                <div class="forecast-summary-box">
+                    <div class="forecast-summary-title">Обоснование</div>
+                    <div class="forecast-summary-text">@Model.Result.Reasoning</div>
+                </div>
 
-                        @if (Model.Result != null)
-                        {
-                            var levelClass = Model.Result.Level?.ToLower() switch
-                            {
-                                "низкий" => "bg-danger-subtle text-danger",
-                                "средний" => "bg-warning-subtle text-warning",
-                                "высокий" => "bg-success-subtle text-success",
-                                _ => "bg-secondary-subtle text-secondary"
-                            };
-                            <span class="badge rounded-pill px-3 py-2 @levelClass">
-                                @Model.Result.Level
-                            </span>
-                        }
+                <div class="forecast-metrics-grid">
+                    <div class="forecast-metric-card">
+                        <div class="forecast-metric-icon">👍</div>
+                        <div>
+                            <div class="forecast-metric-label">Ожидаемые лайки</div>
+                            <div class="forecast-metric-value">@Model.Result.ExpectedLikes</div>
+                        </div>
                     </div>
 
-                    @if (Model.Result != null)
-                    {
-                        <!-- Обоснование -->
-                        <div class="mb-4">
-                            <div class="p-3 bg-light rounded-4 border">
-                                <div class="fw-semibold mb-2">Обоснование</div>
-                                <div>@Model.Result.Reasoning</div>
+                    <div class="forecast-metric-card">
+                        <div class="forecast-metric-icon">💬</div>
+                        <div>
+                            <div class="forecast-metric-label">Комментарии</div>
+                            <div class="forecast-metric-value">@Model.Result.ExpectedComments</div>
+                        </div>
+                    </div>
+
+                    <div class="forecast-metric-card">
+                        <div class="forecast-metric-icon">👁️</div>
+                        <div>
+                            <div class="forecast-metric-label">Просмотры</div>
+                            <div class="forecast-metric-value">@Model.Result.ExpectedViews</div>
+                        </div>
+                    </div>
+
+                    <div class="forecast-metric-card">
+                        <div class="forecast-metric-icon">📈</div>
+                        <div>
+                            <div class="forecast-metric-label">
+                                ER
+                                <span class="forecast-help"
+                                      data-bs-toggle="tooltip"
+                                      data-bs-placement="top"
+                                      data-bs-title="ER — Engagement Rate, показатель вовлеченности. В системе считается как отношение реакций аудитории к просмотрам публикации.">
+                                    ?
+                                </span>
                             </div>
+                            <div class="forecast-metric-value">@Model.Result.ExpectedERPercent.ToString("F1")%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="forecast-info-grid">
+                    <div class="forecast-info-card factors">
+                        <div class="forecast-info-head">
+                            <div class="forecast-info-icon">✓</div>
+                            <h3>Ключевые факторы</h3>
                         </div>
 
-                        <!-- Метрики -->
-                        <div class="row g-3 mb-4">
-                            <div class="col-6 col-md-3">
-                                <div class="border rounded-4 p-3 text-center bg-white">
-                                    <div class="text-muted small">Ожидаемые лайки</div>
-                                    <div class="fw-bold fs-5">👍 @Model.Result.ExpectedLikes</div>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="border rounded-4 p-3 text-center bg-white">
-                                    <div class="text-muted small">Комментарии</div>
-                                    <div class="fw-bold fs-5">💬 @Model.Result.ExpectedComments</div>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="border rounded-4 p-3 text-center bg-white">
-                                    <div class="text-muted small">Просмотры</div>
-                                    <div class="fw-bold fs-5">👁️ @Model.Result.ExpectedViews</div>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-3">
-                                <div class="border rounded-4 p-3 text-center bg-white">
-                                    <div class="text-muted small">ER</div>
-                                    <div class="fw-bold fs-5">@Model.Result.ExpectedERPercent.ToString("F1")%</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Факторы и риски -->
                         @if (Model.Result.KeyFactors.Any())
                         {
-                            <div class="border rounded-4 p-3 mb-3 bg-white">
-                                <h5 class="mb-3">Ключевые факторы</h5>
-                                <ul class="mb-0 ps-3">
-                                    @foreach (var f in Model.Result.KeyFactors)
-                                    {
-                                        <li class="mb-2">@f</li>
-                                    }
-                                </ul>
-                            </div>
+                            <ul class="forecast-list">
+                                @foreach (var item in Model.Result.KeyFactors)
+                                {
+                                    <li>@item</li>
+                                }
+                            </ul>
                         }
+                        else
+                        {
+                            <div class="forecast-empty-text">Ключевые факторы не выделены.</div>
+                        }
+                    </div>
+
+                    <div class="forecast-info-card risks">
+                        <div class="forecast-info-head">
+                            <div class="forecast-info-icon">!</div>
+                            <h3>Риски</h3>
+                        </div>
+
                         @if (Model.Result.Risks.Any())
                         {
-                            <div class="border rounded-4 p-3 mb-3 bg-white">
-                                <h5 class="mb-3">Риски</h5>
-                                <ul class="mb-0 ps-3">
-                                    @foreach (var r in Model.Result.Risks)
-                                    {
-                                        <li class="mb-2">@r</li>
-                                    }
-                                </ul>
-                            </div>
+                            <ul class="forecast-list">
+                                @foreach (var item in Model.Result.Risks)
+                                {
+                                    <li>@item</li>
+                                }
+                            </ul>
                         }
-                        @if (!string.IsNullOrWhiteSpace(Model.Result.ComparisonWithAvg))
+                        else
                         {
-                            <div class="p-3 bg-light rounded-4 border">
-                                <div class="fw-semibold mb-2">Сравнение со средним</div>
-                                <div>@Model.Result.ComparisonWithAvg</div>
-                            </div>
+                            <div class="forecast-empty-text">Существенные риски не выделены.</div>
                         }
-                    }
-                    else if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
-                    {
-                        <div class="alert alert-danger">@Model.ErrorMessage</div>
-                    }
-                    else
-                    {
-                        <div class="d-flex align-items-center justify-content-center h-100">
-                            <div class="text-center text-muted py-5">
-                                <div class="fs-5 fw-semibold mb-2">Пока нет результата</div>
-                                <div>Нажмите кнопку запуска анализа.</div>
-                            </div>
-                        </div>
-                    }
+                    </div>
                 </div>
-            </div>
-        </div>
+
+                @if (!string.IsNullOrWhiteSpace(Model.Result.ComparisonWithAvg))
+                {
+                    <div class="forecast-comparison-card">
+                        <div class="forecast-info-head">
+                            <div class="forecast-info-icon">≈</div>
+                            <h3>Сравнение со средним</h3>
+                        </div>
+
+                        <div class="forecast-comparison-text">
+                            @Model.Result.ComparisonWithAvg
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="forecast-no-result">
+                    <div class="forecast-no-result-icon">📊</div>
+                    <div>
+                        <div class="forecast-no-result-title">Результата пока нет</div>
+                        <div class="forecast-no-result-text">
+                            Запустите генерацию прогноза, чтобы получить ожидаемые метрики и оценку вовлеченности.
+                        </div>
+                    </div>
+                </div>
+            }
+        </section>
     </div>
 </div>
 
@@ -167,6 +236,10 @@
     Hint = "Прогноз может занять некоторое время, так как используется локальная модель."
 })
 
+@{
+    var forecastSubmitText = Model.Result != null ? "Сгенерировать заново" : "Сгенерировать прогноз";
+}
+
 @section Scripts {
     <script>
         initLoadingForm({
@@ -174,7 +247,7 @@
             submitButtonId: "submitBtn",
             overlayId: "forecastLoadingOverlay",
             messageId: "forecastLoadingMessage",
-            submitText: "📊 Сгенерировать прогноз",
+            submitText: @Html.Raw(JsonSerializer.Serialize(forecastSubmitText)),
             loadingButtonText: "Генерация...",
             messages: [
                 "Анализируем историю публикаций сообщества...",
@@ -185,5 +258,66 @@
                 "Почти готово..."
             ]
         });
+
+                document.addEventListener("DOMContentLoaded", function () {
+            const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+
+            tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+                new bootstrap.Tooltip(tooltipTriggerEl, {
+                    trigger: "hover focus",
+                    container: "body"
+                });
+            });
+        });
     </script>
+}
+
+@functions {
+    private string NormalizeLevelText(string? level)
+    {
+        if (string.IsNullOrWhiteSpace(level))
+            return "Прогноз не выполнен";
+
+        var value = level.Trim().ToLowerInvariant();
+
+        return value switch
+        {
+            "очень низкий" => "Очень низкий",
+            "низкий" => "Низкий",
+            "средний" => "Средний",
+            "высокий" => "Высокий",
+            "очень высокий" => "Очень высокий",
+            _ => level.Trim()
+        };
+    }
+
+    private string GetLevelCssClass(string? level)
+    {
+        if (string.IsNullOrWhiteSpace(level))
+            return "pending";
+
+        var value = level.Trim().ToLowerInvariant();
+
+        if (value.Contains("очень низкий") || value == "низкий")
+            return "danger";
+
+        if (value == "средний")
+            return "warning";
+
+        if (value == "высокий" || value.Contains("очень высокий"))
+            return "success";
+
+        return "pending";
+    }
+
+    private string GetQualityCssClass(int score)
+    {
+        if (score < 40)
+            return "danger";
+
+        if (score < 70)
+            return "warning";
+
+        return "success";
+    }
 }

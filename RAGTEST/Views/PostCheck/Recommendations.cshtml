@@ -1,118 +1,201 @@
-﻿@model RAGTEST.Models.RecommendationsPageModel
+﻿@using System.Text.Json
+@model RAGTEST.Models.RecommendationsPageModel
+
 @{
     ViewData["Title"] = "Рекомендации по контенту";
+
+    var hasResult = Model.Result != null;
+    var recommendationsSubmitText = Model.Result != null ? "Сгенерировать заново" : "Сгенерировать рекомендации";
+
+    var textCount = Model.Result?.TextImprovements?.Count ?? 0;
+    var structureCount = Model.Result?.StructuralChanges?.Count ?? 0;
+    var topicsCount = Model.Result?.TopicIdeas?.Count ?? 0;
+    var boostersCount = Model.Result?.EngagementBoosters?.Count ?? 0;
+    var totalCount = textCount + structureCount + topicsCount + boostersCount + (!string.IsNullOrWhiteSpace(Model.Result?.OverallAdvice) ? 1 : 0);
 }
 
-<div class="container py-4">
-    <div class="mb-4">
-        <h1 class="fw-bold mb-2">Рекомендации по контенту</h1>
-        <p class="text-muted mb-0">Практические советы по улучшению текста и повышению вовлеченности.</p>
+<div class="recommendations-page">
+    <div class="recommendations-header">
+        <div>
+            <h1 class="recommendations-title">Рекомендации по контенту</h1>
+            <p class="recommendations-subtitle">
+                Практические советы по улучшению текста, структуры публикации и повышению вовлеченности.
+            </p>
+        </div>
+
+        <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="recommendations-back-top-btn">
+            ← Назад к посту
+        </a>
     </div>
 
-    <div class="row g-4">
-        <!-- Левая колонка: параметры и форма -->
-        <div class="col-lg-5">
-            <div class="card shadow-sm border-0 rounded-4">
-                <div class="card-body p-4">
-                    <h4 class="card-title mb-4">Параметры анализа</h4>
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger rounded-4 border-0 shadow-sm">
+            @Model.ErrorMessage
+        </div>
+    }
 
-                    <div class="mb-3">
-                        <div class="text-muted small">Сообщество</div>
-                        <div class="fw-semibold">@Model.CommunityName</div>
+    <div class="recommendations-layout">
+        <section class="recommendations-post-card">
+            <div class="recommendations-card-head">
+                <div>
+                    <div class="recommendations-label">Сообщество</div>
+                    <div class="recommendations-community">@Model.CommunityName</div>
+                </div>
+
+                <span class="recommendations-status @(hasResult ? "success" : "pending")">
+                    @(hasResult ? "Рекомендации готовы" : "Не выполнено")
+                </span>
+            </div>
+
+            <div class="recommendations-label mb-2">Текст поста</div>
+            <div class="recommendations-post-text">@Model.Text</div>
+
+            <form asp-action="Recommendations" method="post" id="recommendationsForm" class="recommendations-actions">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="postId" value="@Model.PostId" />
+
+                <button type="submit" class="recommendations-primary-btn" id="submitBtn">
+                    @recommendationsSubmitText
+                </button>
+
+                <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="recommendations-secondary-btn">
+                    Назад к посту
+                </a>
+            </form>
+        </section>
+
+        <section class="recommendations-result-card">
+            <div class="recommendations-result-head">
+                <div>
+                    <h2>Результат анализа</h2>
+                    <p>Система формирует рекомендации с учетом текста, параметров сообщества и истории публикаций.</p>
+                </div>
+
+                <span class="recommendations-result-badge @(hasResult ? "success" : "pending")">
+                    @(hasResult ? $"{totalCount} советов" : "Нет результата")
+                </span>
+            </div>
+
+            @if (Model.Result != null)
+            {
+                <div class="recommendations-summary-grid">
+                    <div class="recommendations-summary-card">
+                        <div class="recommendations-summary-value">@textCount</div>
+                        <div class="recommendations-summary-title">Правки текста</div>
+                        <div class="recommendations-summary-text">Что изменить в формулировках и подаче.</div>
                     </div>
 
-                    <div class="mb-3">
-                        <div class="text-muted small mb-2">Текст поста</div>
-                        <div class="border rounded-4 p-3 bg-light" style="white-space: pre-wrap;">@Model.Text</div>
+                    <div class="recommendations-summary-card">
+                        <div class="recommendations-summary-value">@topicsCount</div>
+                        <div class="recommendations-summary-title">Идеи тем</div>
+                        <div class="recommendations-summary-text">Возможные направления для будущего контента.</div>
                     </div>
 
-                    <form asp-action="Recommendations" method="post" id="recommendationsForm">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="postId" value="@Model.PostId" />
-
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg rounded-3" id="submitBtn">
-                                @(Model.Result != null ? "💡 Сгенерировать заново" : "💡 Сгенерировать рекомендации")
-                            </button>
-                        </div>
-                    </form>
-
-                    <div class="mt-3">
-                        <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="btn btn-outline-secondary">
-                            Назад к посту
-                        </a>
+                    <div class="recommendations-summary-card">
+                        <div class="recommendations-summary-value">@boostersCount</div>
+                        <div class="recommendations-summary-title">Вовлечение</div>
+                        <div class="recommendations-summary-text">Приемы для повышения реакции аудитории.</div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Правая колонка: результат -->
-        <div class="col-lg-7">
-            <div class="card shadow-sm border-0 rounded-4 h-100">
-                <div class="card-body p-4">
-                    <h4 class="card-title mb-4">Результат анализа</h4>
-
-                    @if (Model.Result != null)
+                <div class="recommendations-result-list">
+                    @if (Model.Result.TextImprovements.Any())
                     {
-                        <div class="d-flex flex-column gap-4">
-                            @if (Model.Result.TextImprovements.Any())
-                            {
-                                <div class="border rounded-4 p-3 bg-white">
-                                    <h5 class="mb-3">✏️ Правки текста</h5>
-                                    <ul class="mb-0 ps-3">@foreach(var i in Model.Result.TextImprovements){<li class="mb-2">@i</li>}</ul>
-                                </div>
-                            }
-                            @if (Model.Result.StructuralChanges.Any())
-                            {
-                                <div class="border rounded-4 p-3 bg-white">
-                                    <h5 class="mb-3">🏗️ Структурные изменения</h5>
-                                    <ul class="mb-0 ps-3">@foreach(var i in Model.Result.StructuralChanges){<li class="mb-2">@i</li>}</ul>
-                                </div>
-                            }
-                            @if (Model.Result.TopicIdeas.Any())
-                            {
-                                <div class="border rounded-4 p-3 bg-white">
-                                    <h5 class="mb-3">💡 Темы для контента</h5>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        @foreach (var t in Model.Result.TopicIdeas)
-                                        {
-                                            <span class="badge rounded-pill bg-light text-dark border">@t</span>
-                                        }
-                                    </div>
-                                </div>
-                            }
-                            @if (Model.Result.EngagementBoosters.Any())
-                            {
-                                <div class="border rounded-4 p-3 bg-white">
-                                    <h5 class="mb-3">🚀 Приёмы вовлеченности</h5>
-                                    <ul class="mb-0 ps-3">@foreach(var b in Model.Result.EngagementBoosters){<li class="mb-2">@b</li>}</ul>
-                                </div>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(Model.Result.OverallAdvice))
-                            {
-                                <div class="p-3 bg-light rounded-4 border">
-                                    <div class="fw-semibold mb-2">📌 Общий совет</div>
-                                    <div>@Model.Result.OverallAdvice</div>
-                                </div>
-                            }
-                        </div>
-                        }
-                            else if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
-                        {
-                        <div class="alert alert-danger">@Model.ErrorMessage</div>
-                        }
-                        else
-                        {
-                            <div class="d-flex align-items-center justify-content-center h-100">
-                                <div class="text-center text-muted py-5">
-                                    <div class="fs-5 fw-semibold mb-2">Пока нет результата</div>
-                                    <div>Нажмите кнопку запуска анализа.</div>
-                                </div>
+                        <article class="recommendations-info-card text">
+                            <div class="recommendations-info-head">
+                                <div class="recommendations-info-icon">✏️</div>
+                                <h3>Правки текста</h3>
                             </div>
-                        }
+
+                            <ul class="recommendations-list">
+                                @foreach (var item in Model.Result.TextImprovements)
+                                {
+                                    <li>@item</li>
+                                }
+                            </ul>
+                        </article>
+                    }
+
+                    @if (Model.Result.StructuralChanges.Any())
+                    {
+                        <article class="recommendations-info-card structure">
+                            <div class="recommendations-info-head">
+                                <div class="recommendations-info-icon">▦</div>
+                                <h3>Структурные изменения</h3>
+                            </div>
+
+                            <ul class="recommendations-list">
+                                @foreach (var item in Model.Result.StructuralChanges)
+                                {
+                                    <li>@item</li>
+                                }
+                            </ul>
+                        </article>
+                    }
+
+                    @if (Model.Result.TopicIdeas.Any())
+                    {
+                        <article class="recommendations-info-card topics">
+                            <div class="recommendations-info-head">
+                                <div class="recommendations-info-icon">💡</div>
+                                <h3>Темы для контента</h3>
+                            </div>
+
+                            <div class="recommendations-topic-list">
+                                @foreach (var topic in Model.Result.TopicIdeas)
+                                {
+                                    <span class="recommendations-topic-chip">@topic</span>
+                                }
+                            </div>
+                        </article>
+                    }
+
+                    @if (Model.Result.EngagementBoosters.Any())
+                    {
+                        <article class="recommendations-info-card boosters">
+                            <div class="recommendations-info-head">
+                                <div class="recommendations-info-icon">🚀</div>
+                                <h3>Приёмы вовлеченности</h3>
+                            </div>
+
+                            <ul class="recommendations-list">
+                                @foreach (var item in Model.Result.EngagementBoosters)
+                                {
+                                    <li>@item</li>
+                                }
+                            </ul>
+                        </article>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(Model.Result.OverallAdvice))
+                    {
+                        <article class="recommendations-advice-card">
+                            <div class="recommendations-info-head">
+                                <div class="recommendations-info-icon">📌</div>
+                                <h3>Общий совет</h3>
+                            </div>
+
+                            <div class="recommendations-advice-text">
+                                @Model.Result.OverallAdvice
+                            </div>
+                        </article>
+                    }
                 </div>
-            </div>
-        </div>
+            }
+            else
+            {
+                <div class="recommendations-no-result">
+                    <div class="recommendations-no-result-icon">💡</div>
+                    <div>
+                        <div class="recommendations-no-result-title">Результата пока нет</div>
+                        <div class="recommendations-no-result-text">
+                            Запустите генерацию, чтобы получить правки текста, идеи тем и советы по вовлеченности.
+                        </div>
+                    </div>
+                </div>
+            }
+        </section>
     </div>
 </div>
 
@@ -132,7 +215,7 @@
             submitButtonId: "submitBtn",
             overlayId: "recommendationsLoadingOverlay",
             messageId: "recommendationsLoadingMessage",
-            submitText: "💡 Сгенерировать рекомендации",
+            submitText: @Html.Raw(JsonSerializer.Serialize(recommendationsSubmitText)),
             loadingButtonText: "Генерация...",
             messages: [
                 "Анализируем текст публикации...",

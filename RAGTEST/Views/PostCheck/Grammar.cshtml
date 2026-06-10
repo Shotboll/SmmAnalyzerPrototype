@@ -2,14 +2,24 @@
 
 @{
     ViewData["Title"] = "Проверка на ошибки";
+
+    var acceptedCount = Model.Cards?.Count ?? 0;
+    var suspiciousCount = Model.SuspiciousCards?.Count ?? 0;
+    var totalCount = acceptedCount + suspiciousCount;
 }
 
-<div class="container py-4">
-    <div class="page-header">
-        <h1 class="page-title">Проверка поста на ошибки</h1>
-        <p class="page-subtitle">
-            Проверка выполняется для уже сохранённого поста. Пояснение по каждой ошибке можно запросить отдельно.
-        </p>
+<div class="grammar-page">
+    <div class="grammar-page-header">
+        <div>
+            <h1 class="grammar-page-title">Проверка на ошибки</h1>
+            <p class="grammar-page-subtitle">
+                Система проверяет орфографию, пунктуацию и спорные языковые срабатывания в тексте поста.
+            </p>
+        </div>
+
+        <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="grammar-back-top-btn">
+            ← Назад к посту
+        </a>
     </div>
 
     @if (ViewBag.Error != null)
@@ -17,157 +27,230 @@
         <div class="alert alert-danger mb-4">@ViewBag.Error</div>
     }
 
-    <div class="app-card mb-4">
-        <div class="app-card-body">
-            <div class="mb-3">
-                <div class="text-muted small">Сообщество</div>
-                <div class="fw-semibold">@Model.CommunityName</div>
+    <div class="grammar-post-card">
+        <div class="grammar-post-header">
+            <div>
+                <div class="grammar-label">Сообщество</div>
+                <div class="grammar-community">@Model.CommunityName</div>
             </div>
 
-            <div class="mb-3">
-                <div class="text-muted small mb-2">Текст поста</div>
-                <div class="post-content-box">@Model.Text</div>
-            </div>
-
-            <form asp-action="Grammar" method="post" id="grammarForm">
-                @Html.AntiForgeryToken()
-                <input asp-for="PostId" type="hidden" />
-
-                <div class="d-flex flex-wrap gap-2">
-                    <button type="submit" class="btn btn-primary" id="submitBtn">
-                        Проверить
-                    </button>
-
-                    <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="btn btn-outline-secondary">
-                        Назад к посту
-                    </a>
+            @if (Model.HasResult)
+            {
+                <div class="grammar-result-badge @(totalCount > 0 ? "has-errors" : "clean")">
+                    @(totalCount > 0 ? $"Найдено замечаний: {totalCount}" : "Ошибок не найдено")
                 </div>
-            </form>
+            }
+            else
+            {
+                <div class="grammar-result-badge pending">
+                    Проверка не запускалась
+                </div>
+            }
         </div>
+
+        <div class="grammar-label mb-2">Текст поста</div>
+        <div class="grammar-post-text">@Model.Text</div>
+
+        <form asp-action="Grammar" method="post" id="grammarForm" class="grammar-actions">
+            @Html.AntiForgeryToken()
+            <input asp-for="PostId" type="hidden" />
+
+            <button type="submit" class="grammar-primary-btn" id="submitBtn">
+                Проверить заново
+            </button>
+
+            <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="grammar-secondary-btn">
+                Назад к посту
+            </a>
+        </form>
     </div>
 
     @if (Model.HasResult)
     {
-        <div class="row g-4">
-            <div class="col-lg-6">
-                <div class="app-card h-100">
-                    <div class="app-card-body">
-                        <div class="d-flex justify-content-between align-items-start gap-3 mb-3 flex-wrap">
-                            <div>
-                                <h3 class="section-card-title mb-1">Подтверждённые ошибки</h3>
-                                <p class="section-card-text mb-0">Ошибки, которые прошли фильтрацию и показаны в основном результате.</p>
-                            </div>
-                            <span class="status-chip neutral">@Model.Cards.Count</span>
-                        </div>
+        <div class="grammar-summary-grid">
+            <div class="grammar-summary-card accepted">
+                <div class="grammar-summary-value">@acceptedCount</div>
+                <div class="grammar-summary-title">Подтверждённые ошибки</div>
+                <div class="grammar-summary-text">Срабатывания, которые система считает достаточно надёжными.</div>
+            </div>
 
-                        @if (Model.Cards.Any())
+            <div class="grammar-summary-card suspicious">
+                <div class="grammar-summary-value">@suspiciousCount</div>
+                <div class="grammar-summary-title">Сомнительные случаи</div>
+                <div class="grammar-summary-text">Фрагменты, которые лучше проверить вручную.</div>
+            </div>
+
+            <div class="grammar-summary-card total">
+                <div class="grammar-summary-value">@totalCount</div>
+                <div class="grammar-summary-title">Всего замечаний</div>
+                <div class="grammar-summary-text">Общее количество найденных и показанных пользователю мест.</div>
+            </div>
+        </div>
+
+        <div class="grammar-results-grid">
+            <section class="grammar-result-section">
+                <div class="grammar-section-head">
+                    <div>
+                        <h2>Подтверждённые ошибки</h2>
+                        <p>Ошибки, которые прошли фильтрацию и отображаются как основной результат.</p>
+                    </div>
+
+                    <span class="grammar-count-chip accepted">@acceptedCount</span>
+                </div>
+
+                @if (Model.Cards.Any())
+                {
+                    <div class="grammar-error-list">
+                        @for (int i = 0; i < Model.Cards.Count; i++)
                         {
-                            @for (int i = 0; i < Model.Cards.Count; i++)
-                            {
-                                var item = Model.Cards[i];
+                            var item = Model.Cards[i];
 
-                                <div class="inner-card mb-3">
-                                    <div><strong>Фрагмент:</strong> @item.Original</div>
-
-                                    @if (!string.IsNullOrWhiteSpace(item.Correction))
-                                    {
-                                        <div><strong>Исправление:</strong> @item.Correction</div>
-                                    }
-
-                                    @if (!string.IsNullOrWhiteSpace(item.Type))
-                                    {
-                                        <div><strong>Тип:</strong> @item.Type</div>
-                                    }
-
-                                    @if (!string.IsNullOrWhiteSpace(item.Hint))
-                                    {
-                                        <div><strong>Комментарий:</strong> @item.Hint</div>
-                                    }
-
-                                    <div class="mt-3 d-flex flex-wrap gap-2">
-                                        <button type="button"
-                                                class="btn btn-sm btn-outline-primary explain-btn"
-                                                data-fragment="@item.Original"
-                                                data-suggestion="@item.Correction"
-                                                data-type="@item.Type"
-                                                data-message="@item.Hint"
-                                                data-sentence="@item.Sentence"
-                                                data-target="accepted-explanation-@i">
-                                            Пояснить
-                                        </button>
+                            <article class="grammar-error-card accepted">
+                                <div class="grammar-error-top">
+                                    <div>
+                                        <div class="grammar-error-label">Фрагмент</div>
+                                        <div class="grammar-error-fragment">@item.Original</div>
                                     </div>
 
-                                    <div id="accepted-explanation-@i" class="mt-3"></div>
+                                    <span class="grammar-error-status accepted">Ошибка</span>
                                 </div>
-                            }
-                        }
-                        else
-                        {
-                            <div class="empty-state">
-                                Ошибок не найдено.
-                            </div>
-                        }
-                    </div>
-                </div>
-            </div>
 
-            <div class="col-lg-6">
-                <div class="app-card h-100">
-                    <div class="app-card-body">
-                        <div class="d-flex justify-content-between align-items-start gap-3 mb-3 flex-wrap">
-                            <div>
-                                <h3 class="section-card-title mb-1">Сомнительные случаи</h3>
-                                <p class="section-card-text mb-0">Места, которые стоит проверить вручную дополнительно.</p>
-                            </div>
-                            <span class="status-chip warning">@Model.SuspiciousCards.Count</span>
-                        </div>
-
-                        @if (Model.SuspiciousCards.Any())
-                        {
-                            @for (int i = 0; i < Model.SuspiciousCards.Count; i++)
-                            {
-                                var item = Model.SuspiciousCards[i];
-
-                                <div class="inner-card mb-3">
-                                    <div><strong>Фрагмент:</strong> @item.Original</div>
-
+                                <div class="grammar-error-body">
                                     @if (!string.IsNullOrWhiteSpace(item.Correction))
                                     {
-                                        <div><strong>Исправление:</strong> @item.Correction</div>
+                                        <div class="grammar-error-row">
+                                            <span>Исправление</span>
+                                            <strong>@item.Correction</strong>
+                                        </div>
                                     }
 
-                                    @if (!string.IsNullOrWhiteSpace(item.Type))
-                                    {
-                                        <div><strong>Тип:</strong> @item.Type</div>
+                                    @{
+                                        var categoryText = GetGrammarCategoryText(item.Type, item.Hint);
                                     }
+
+                                    <div class="grammar-error-row">
+                                        <span>Категория</span>
+                                        <strong>@categoryText</strong>
+                                    </div>
 
                                     @if (!string.IsNullOrWhiteSpace(item.Hint))
                                     {
-                                        <div><strong>Комментарий:</strong> @item.Hint</div>
+                                        <div class="grammar-error-comment">
+                                            @item.Hint
+                                        </div>
                                     }
-
-                                    <div class="section-state warning mt-2">Сомнительный случай</div>
                                 </div>
-                            }
-                        }
-                        else
-                        {
-                            <div class="empty-state">
-                                Сомнительных мест не найдено.
-                            </div>
+
+                                <div class="grammar-error-footer">
+                                    <button type="button"
+                                            class="grammar-explain-btn explain-btn"
+                                            data-fragment="@item.Original"
+                                            data-suggestion="@item.Correction"
+                                            data-type="@item.Type"
+                                            data-message="@item.Hint"
+                                            data-sentence="@item.Sentence"
+                                            data-target="accepted-explanation-@i">
+                                        Получить пояснение
+                                    </button>
+                                </div>
+
+                                <div id="accepted-explanation-@i" class="grammar-explanation"></div>
+                            </article>
                         }
                     </div>
+                }
+                else
+                {
+                    <div class="grammar-empty-result">
+                        <div class="grammar-empty-icon">✓</div>
+                        <div>
+                            <div class="grammar-empty-title">Подтверждённых ошибок нет</div>
+                            <div class="grammar-empty-text">Основная проверка не выявила надёжных ошибок.</div>
+                        </div>
+                    </div>
+                }
+            </section>
+
+            <section class="grammar-result-section">
+                <div class="grammar-section-head">
+                    <div>
+                        <h2>Сомнительные случаи</h2>
+                        <p>Места, которые могут быть ложными срабатываниями и требуют ручной проверки.</p>
+                    </div>
+
+                    <span class="grammar-count-chip suspicious">@suspiciousCount</span>
                 </div>
-            </div>
+
+                @if (Model.SuspiciousCards.Any())
+                {
+                    <div class="grammar-error-list">
+                        @for (int i = 0; i < Model.SuspiciousCards.Count; i++)
+                        {
+                            var item = Model.SuspiciousCards[i];
+
+                            <article class="grammar-error-card suspicious">
+                                <div class="grammar-error-top">
+                                    <div>
+                                        <div class="grammar-error-label">Фрагмент</div>
+                                        <div class="grammar-error-fragment">@item.Original</div>
+                                    </div>
+
+                                    <span class="grammar-error-status suspicious">Проверить</span>
+                                </div>
+
+                                <div class="grammar-error-body">
+                                    @if (!string.IsNullOrWhiteSpace(item.Correction))
+                                    {
+                                        <div class="grammar-error-row">
+                                            <span>Возможное исправление</span>
+                                            <strong>@item.Correction</strong>
+                                        </div>
+                                    }
+
+                                    @{
+                                        var categoryText = GetGrammarCategoryText(item.Type, item.Hint);
+                                    }
+
+                                    <div class="grammar-error-row">
+                                        <span>Категория</span>
+                                        <strong>@categoryText</strong>
+                                    </div>
+
+                                    @if (!string.IsNullOrWhiteSpace(item.Hint))
+                                    {
+                                        <div class="grammar-error-comment">
+                                            @item.Hint
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="grammar-suspicious-note">
+                                    Сомнительное срабатывание: решение лучше принять вручную.
+                                </div>
+                            </article>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="grammar-empty-result">
+                        <div class="grammar-empty-icon">✓</div>
+                        <div>
+                            <div class="grammar-empty-title">Сомнительных случаев нет</div>
+                            <div class="grammar-empty-text">Фильтр не нашёл спорных срабатываний.</div>
+                        </div>
+                    </div>
+                }
+            </section>
         </div>
     }
     else
     {
-        <div class="app-card">
-            <div class="app-card-body">
-                <div class="empty-state">
-                    Результаты проверки появятся здесь после запуска анализа.
-                </div>
+        <div class="grammar-no-result-card">
+            <div class="grammar-empty-icon">↻</div>
+            <div>
+                <div class="grammar-empty-title">Результатов пока нет</div>
+                <div class="grammar-empty-text">Запустите проверку, чтобы увидеть найденные ошибки и сомнительные случаи.</div>
             </div>
         </div>
     }
@@ -179,7 +262,7 @@
     MessageId = "grammarLoadingMessage",
     Title = "Идёт проверка текста",
     InitialMessage = "Выполняется анализ орфографии и пунктуации...",
-    Hint = "Это может занять некоторое время, так как используется локальная модель."
+    Hint = "Обычно проверка выполняется быстро, так как для базовой проверки используется LanguageTool."
 })
 
 @section Scripts {
@@ -189,12 +272,12 @@
             submitButtonId: "submitBtn",
             overlayId: "grammarLoadingOverlay",
             messageId: "grammarLoadingMessage",
-            submitText: "Проверить",
-            loadingButtonText: "Идёт анализ...",
+            submitText: "Проверить заново",
+            loadingButtonText: "Идёт проверка...",
             messages: [
                 "Выполняется анализ орфографии и пунктуации...",
                 "Проверяются возможные ошибки в тексте...",
-                "Обрабатывается результат проверки...",
+                "Фильтруются ложные срабатывания...",
                 "Формируется список найденных ошибок...",
                 "Почти готово..."
             ]
@@ -217,9 +300,9 @@
                     this.textContent = "Загрузка...";
 
                     target.innerHTML = `
-                        <div class="summary-panel">
-                            <div class="fw-semibold mb-2">Пояснение</div>
-                            <div class="text-muted">Запрашиваем пояснение у модели...</div>
+                        <div class="grammar-explanation-box loading">
+                            <div class="grammar-explanation-title">Пояснение</div>
+                            <div class="grammar-explanation-text">Запрашиваем пояснение у модели...</div>
                         </div>
                     `;
 
@@ -229,7 +312,7 @@
                             headers: {
                                 "Content-Type": "application/json"
                             },
-                                body: JSON.stringify({
+                            body: JSON.stringify({
                                 fragment: this.dataset.fragment || "",
                                 suggestion: this.dataset.suggestion || "",
                                 type: this.dataset.type || "",
@@ -245,10 +328,12 @@
                         const data = await response.json();
 
                         target.innerHTML = `
-                            <div class="summary-panel">
-                                <div class="fw-semibold mb-2">Пояснение</div>
-                                <div class="mb-2">${escapeHtml(data.explanation || "")}</div>
-                                <div><strong>Совет:</strong> ${escapeHtml(data.hint || "")}</div>
+                            <div class="grammar-explanation-box">
+                                <div class="grammar-explanation-title">Пояснение</div>
+                                <div class="grammar-explanation-text">${escapeHtml(data.explanation || "")}</div>
+                                <div class="grammar-explanation-advice">
+                                    <strong>Совет:</strong> ${escapeHtml(data.hint || "")}
+                                </div>
                             </div>
                         `;
                     } catch (error) {
@@ -271,4 +356,41 @@
             }
         });
     </script>
+}
+
+@functions {
+    private string GetGrammarCategoryText(string? type, string? message)
+    {
+        var rawType = type?.Trim().ToLowerInvariant() ?? string.Empty;
+        var rawMessage = message?.Trim().ToLowerInvariant() ?? string.Empty;
+
+        if (rawMessage.Contains("запята") || rawMessage.Contains("пунктуац"))
+            return "Пунктуация";
+
+        if (rawMessage.Contains("дефис"))
+            return "Дефисное написание";
+
+        if (rawMessage.Contains("слитно"))
+            return "Слитное написание";
+
+        if (rawMessage.Contains("раздельно"))
+            return "Раздельное написание";
+
+        if (rawMessage.Contains("пробел"))
+            return "Пробелы";
+
+        if (rawMessage.Contains("орфограф") || rawType.Contains("misspelling"))
+            return "Орфография";
+
+        if (rawMessage.Contains("регистр") || rawMessage.Contains("заглавн") || rawMessage.Contains("строчн"))
+            return "Регистр букв";
+
+        if (rawMessage.Contains("повтор"))
+            return "Повтор слова";
+
+        if (rawType.Contains("uncategorized"))
+            return "Языковое замечание";
+
+        return "Языковое замечание";
+    }
 }

@@ -2,109 +2,183 @@
 
 @{
     ViewData["Title"] = "Проверка по регламентам";
+
+    var violationsCount = Model.Violations?.Count ?? 0;
+    var resultText = Model.HasResult
+        ? (Model.HasViolations ? "Обнаружены нарушения" : "Нарушений не найдено")
+        : "Проверка не выполнена";
 }
 
-<div class="container reg-page mt-4">
-    <h2 class="mb-2">Проверка поста по регламентам</h2>
-    <div class="page-subtitle">
-        Проверка выполняется для сохранённого поста по правилам выбранного сообщества.
-    </div>
-
-    <div class="editor-card">
-        <div class="mb-3">
-            <div class="text-muted small">Сообщество</div>
-            <div class="fw-semibold">@Model.CommunityName</div>
+<div class="regulation-check-page">
+    <div class="regulation-check-header">
+        <div>
+            <h1 class="regulation-check-title">Проверка по регламентам</h1>
+            <p class="regulation-check-subtitle">
+                Анализ текста публикации на соответствие правилам выбранного сообщества.
+            </p>
         </div>
 
-        <div class="mb-3">
-            <div class="text-muted small mb-2">Текст поста</div>
-            <div class="border rounded-4 p-3 bg-light" style="white-space: pre-wrap;">@Model.Text</div>
-        </div>
-
-        <form asp-action="Regulations" method="post" id="regulationForm">
-            @Html.AntiForgeryToken()
-            <input asp-for="PostId" type="hidden" />
-
-            <div class="d-flex gap-2 flex-wrap">
-                <button type="submit" class="btn btn-primary" id="submitBtn">Проверить</button>
-                <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="btn btn-outline-secondary">
-                    Назад к посту
-                </a>
-            </div>
-        </form>
+        <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="regulation-check-back-top-btn">
+            ← Назад к посту
+        </a>
     </div>
 
     @if (ViewBag.Error != null)
     {
-        <div class="alert alert-danger mt-4">
+        <div class="alert alert-danger rounded-4 border-0 shadow-sm">
             @ViewBag.Error
         </div>
     }
 
-    @if (Model.HasResult)
-    {
-        <div class="result-card">
-            <div class="result-status @(Model.HasViolations ? "bad" : "ok")">
-                @(Model.HasViolations ? "Обнаружены нарушения" : "Нарушений не найдено")
+    <div class="regulation-check-layout">
+        <section class="regulation-check-post-card">
+            <div class="regulation-check-card-head">
+                <div>
+                    <div class="regulation-check-label">Сообщество</div>
+                    <div class="regulation-check-community">@Model.CommunityName</div>
+                </div>
+
+                <span class="regulation-check-status @(Model.HasResult ? (Model.HasViolations ? "danger" : "success") : "pending")">
+                    @resultText
+                </span>
             </div>
 
-            @if (!string.IsNullOrWhiteSpace(Model.Comment))
+            <div class="regulation-check-label mb-2">Текст поста</div>
+            <div class="regulation-check-post-text">@Model.Text</div>
+
+            <form asp-action="Regulations" method="post" id="regulationForm" class="regulation-check-actions">
+                @Html.AntiForgeryToken()
+                <input asp-for="PostId" type="hidden" />
+
+                <button type="submit" class="regulation-check-primary-btn" id="submitBtn">
+                    Проверить заново
+                </button>
+
+                <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="regulation-check-secondary-btn">
+                    Назад к посту
+                </a>
+            </form>
+        </section>
+
+        <section class="regulation-check-result-card">
+            <div class="regulation-check-result-head">
+                <div>
+                    <h2>Результат проверки</h2>
+                    <p>Система сравнивает текст публикации с регламентами, привязанными к выбранному сообществу.</p>
+                </div>
+
+                <span class="regulation-check-result-badge @(Model.HasResult ? (Model.HasViolations ? "danger" : "success") : "pending")">
+                    @resultText
+                </span>
+            </div>
+
+            @if (Model.HasResult)
             {
-                <p class="result-comment">@Model.Comment</p>
-            }
+                <div class="regulation-summary-grid">
+                    <div class="regulation-summary-card @(Model.HasViolations ? "danger" : "success")">
+                        <div class="regulation-summary-value">@violationsCount</div>
+                        <div class="regulation-summary-title">Найдено нарушений</div>
+                        <div class="regulation-summary-text">
+                            @(Model.HasViolations ? "Публикация содержит спорные или запрещённые элементы." : "Проверка не выявила нарушений регламентов.")
+                        </div>
+                    </div>
 
-            @if (Model.Violations.Any())
-            {
-                <div class="violations-list">
-                    @foreach (var item in Model.Violations)
-                    {
-                        <div class="violation-item">
-                            <div class="violation-row">
-                                <div>
-                                    <div class="rule-chip">Правило</div>
-                                </div>
+                    <div class="regulation-summary-card info">
+                        <div class="regulation-summary-value">RAG</div>
+                        <div class="regulation-summary-title">Метод проверки</div>
+                        <div class="regulation-summary-text">
+                            Используются релевантные фрагменты регламентов и локальная языковая модель.
+                        </div>
+                    </div>
+                </div>
 
-                                <div class="violation-content">
-                                    <h5 class="violation-title">Нарушение регламента</h5>
+                @if (!string.IsNullOrWhiteSpace(Model.Comment))
+                {
+                    <div class="regulation-comment-box @(Model.HasViolations ? "danger" : "success")">
+                        <div class="regulation-comment-title">Общий вывод</div>
+                        <div class="regulation-comment-text">@Model.Comment</div>
+                    </div>
+                }
 
-                                    <div class="field-group">
-                                        <div class="field-label">Фрагмент поста</div>
-                                        <div class="field-text">
-                                            <span class="matched-inline">
-                                                @(string.IsNullOrWhiteSpace(item.MatchedText) ? "Не указан" : item.MatchedText)
-                                            </span>
+                @if (Model.Violations.Any())
+                {
+                    <div class="regulation-violations-section">
+                        <div class="regulation-section-head">
+                            <div>
+                                <h3>Найденные нарушения</h3>
+                                <p>Фрагменты поста, которые модель связала с ограничениями из регламентов.</p>
+                            </div>
+
+                            <span class="regulation-count-chip danger">@violationsCount</span>
+                        </div>
+
+                        <div class="regulation-violations-list">
+                            @foreach (var item in Model.Violations)
+                            {
+                                <article class="regulation-violation-card">
+                                    <div class="regulation-violation-top">
+                                        <div>
+                                            <div class="regulation-violation-label">Тип результата</div>
+                                            <div class="regulation-violation-title">Нарушение регламента</div>
                                         </div>
+
+                                        <span class="regulation-violation-status">Нарушение</span>
                                     </div>
 
-                                    @if (!string.IsNullOrWhiteSpace(item.Explanation))
-                                    {
-                                        <div class="field-group">
-                                            <div class="field-label">Причина</div>
-                                            <p class="field-text">@item.Explanation</p>
+                                    <div class="regulation-violation-body">
+                                        <div class="regulation-violation-field">
+                                            <div class="regulation-violation-field-label">Фрагмент поста</div>
+                                            <div class="regulation-violation-fragment">
+                                                @(string.IsNullOrWhiteSpace(item.MatchedText) ? "Фрагмент не указан" : item.MatchedText)
+                                            </div>
                                         </div>
-                                    }
 
-                                    @if (!string.IsNullOrWhiteSpace(item.RuleShort))
-                                    {
-                                        <div class="field-group">
-                                            <div class="field-label">Основание</div>
-                                            <p class="field-text rule-text">@item.RuleShort</p>
-                                        </div>
-                                    }
-                                </div>
-                            </div>
+                                        @if (!string.IsNullOrWhiteSpace(item.Explanation))
+                                        {
+                                            <div class="regulation-violation-field">
+                                                <div class="regulation-violation-field-label">Причина</div>
+                                                <div class="regulation-violation-text">@item.Explanation</div>
+                                            </div>
+                                        }
+
+                                        @if (!string.IsNullOrWhiteSpace(item.RuleShort))
+                                        {
+                                            <div class="regulation-violation-field">
+                                                <div class="regulation-violation-field-label">Основание</div>
+                                                <div class="regulation-rule-chip">@item.RuleShort</div>
+                                            </div>
+                                        }
+                                    </div>
+                                </article>
+                            }
                         </div>
-                    }
+                    </div>
+                }
+                else
+                {
+                    <div class="regulation-empty-result">
+                        <div class="regulation-empty-icon">✓</div>
+                        <div>
+                            <div class="regulation-empty-title">Нарушений не найдено</div>
+                            <div class="regulation-empty-text">Текст не содержит явных нарушений выбранных регламентов.</div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="regulation-no-result">
+                    <div class="regulation-empty-icon">📄</div>
+                    <div>
+                        <div class="regulation-empty-title">Результата пока нет</div>
+                        <div class="regulation-empty-text">
+                            Запустите проверку, чтобы система сравнила текст с регламентами сообщества.
+                        </div>
+                    </div>
                 </div>
             }
-        </div>
-    }
-    else
-    {
-        <div class="empty-state">
-            Результаты проверки появятся здесь после запуска анализа.
-        </div>
-    }
+        </section>
+    </div>
 </div>
 
 @await Html.PartialAsync("_LoadingOverlay", new RAGTEST.Models.LoadingOverlayViewModel
@@ -123,7 +197,7 @@
             submitButtonId: "submitBtn",
             overlayId: "regulationLoadingOverlay",
             messageId: "regulationLoadingMessage",
-            submitText: "Проверить",
+            submitText: "Проверить заново",
             loadingButtonText: "Проверка...",
             messages: [
                 "Выполняется анализ текста и поиск нарушений...",

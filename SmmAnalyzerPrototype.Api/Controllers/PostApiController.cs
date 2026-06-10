@@ -209,6 +209,7 @@ namespace SmmAnalyzerPrototype.Api.Controllers
                         dto.ForecastComments = forecast.ExpectedComments;
                         dto.ForecastViews = forecast.ExpectedViews;
                         dto.ForecastERPercent = forecast.ExpectedERPercent;
+                        dto.ForecastConfidence = forecast.Confidence;
                         dto.ForecastReasoning = forecast.Reasoning;
                         dto.ForecastKeyFactors = forecast.KeyFactors ?? new();
                         dto.ForecastRisks = forecast.Risks ?? new();

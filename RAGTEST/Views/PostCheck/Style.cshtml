@@ -2,159 +2,161 @@
 
 @{
     ViewData["Title"] = "Проверка стиля";
+
+    var hasResult = Model.Result != null;
+    var assessmentText = hasResult
+    ? NormalizeAssessmentText(Model.Result!.Assessment)
+    : "Проверка не выполнена";
 }
 
-<div class="container py-4">
-    <div class="mb-4">
-        <h1 class="fw-bold mb-2">Проверка стиля текста</h1>
-        <p class="text-muted mb-0">Анализ выполняется для сохранённого поста.</p>
+<div class="style-check-page">
+    <div class="style-check-header">
+        <div>
+            <h1 class="style-check-title">Проверка стиля</h1>
+            <p class="style-check-subtitle">
+                Анализ соответствия текста целевой аудитории и стилю выбранного сообщества.
+            </p>
+        </div>
+
+        <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="style-check-back-top-btn">
+            ← Назад к посту
+        </a>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
     {
-        <div class="alert alert-danger shadow-sm border-0 rounded-4">
+        <div class="alert alert-danger rounded-4 border-0 shadow-sm">
             @Model.ErrorMessage
         </div>
     }
 
-    <div class="row g-4">
-        <div class="col-lg-5">
-            <div class="card shadow-sm border-0 rounded-4">
-                <div class="card-body p-4">
-                    <h4 class="card-title mb-4">Параметры анализа</h4>
-
-                    <div class="mb-3">
-                        <div class="text-muted small">Сообщество</div>
-                        <div class="fw-semibold">@Model.CommunityName</div>
-                    </div>
-
-                    <div class="mb-3">
-                        <div class="text-muted small mb-2">Текст поста</div>
-                        <div class="border rounded-4 p-3 bg-light" style="white-space: pre-wrap;">@Model.Text</div>
-                    </div>
-
-                    <form asp-action="Style" method="post" id="styleCheckForm">
-                        @Html.AntiForgeryToken()
-                        <input asp-for="PostId" type="hidden" />
-
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg rounded-3" id="submitBtn">
-                                Проверить стиль
-                            </button>
-                        </div>
-                    </form>
-
-                    <div class="mt-3">
-                        <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="btn btn-outline-secondary">
-                            Назад к посту
-                        </a>
-                    </div>
+    <div class="style-check-layout">
+        <section class="style-check-post-card">
+            <div class="style-check-card-head">
+                <div>
+                    <div class="style-check-label">Сообщество</div>
+                    <div class="style-check-community">@Model.CommunityName</div>
                 </div>
+
+                <span class="style-check-status @GetAssessmentCssClass(assessmentText)">
+                    @assessmentText
+                </span>
             </div>
-        </div>
 
-        <div class="col-lg-7">
-            <div class="card shadow-sm border-0 rounded-4 h-100">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <h4 class="card-title mb-0">Результат анализа</h4>
+            <div class="style-check-label mb-2">Текст поста</div>
+            <div class="style-check-post-text">@Model.Text</div>
 
-                        @if (Model.Result != null)
+            <form asp-action="Style" method="post" id="styleCheckForm" class="style-check-actions">
+                @Html.AntiForgeryToken()
+                <input asp-for="PostId" type="hidden" />
+
+                <button type="submit" class="style-check-primary-btn" id="submitBtn">
+                    Проверить стиль
+                </button>
+
+                <a asp-controller="Post" asp-action="Details" asp-route-id="@Model.PostId" class="style-check-secondary-btn">
+                    Назад к посту
+                </a>
+            </form>
+        </section>
+
+        <section class="style-check-result-card">
+            <div class="style-check-result-head">
+                <div>
+                    <h2>Результат анализа</h2>
+                    <p>Оценка того, насколько текст подходит под аудиторию и стиль сообщества.</p>
+                </div>
+
+                <span class="style-check-result-badge @GetAssessmentCssClass(assessmentText)">
+                    @assessmentText
+                </span>
+            </div>
+
+            @if (Model.Result != null)
+            {
+                <div class="style-check-summary-box">
+                    <div class="style-check-summary-title">Общий вывод</div>
+                    <div class="style-check-summary-text">@Model.Result.Summary</div>
+                </div>
+
+                <div class="style-check-result-grid">
+                    <div class="style-check-info-card strengths">
+                        <div class="style-check-info-head">
+                            <div class="style-check-info-icon">✓</div>
+                            <h3>Сильные стороны</h3>
+                        </div>
+
+                        @if (Model.Result.Strengths.Any())
                         {
-                            var badgeClass = Model.Result.Assessment?.ToLower() switch
-                            {
-                                "соответствует" => "bg-success-subtle text-success",
-                                "частично соответствует" => "bg-warning-subtle text-warning",
-                                "не соответствует" => "bg-danger-subtle text-danger",
-                                _ => "bg-secondary-subtle text-secondary"
-                            };
-
-                            <span class="badge rounded-pill px-3 py-2 @badgeClass">
-                                @Model.Result.Assessment
-                            </span>
+                            <ul class="style-check-list">
+                                @foreach (var item in Model.Result.Strengths)
+                                {
+                                    <li>@item</li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <div class="style-check-empty-text">Сильные стороны не выделены.</div>
                         }
                     </div>
 
-                    @if (Model.Result != null)
+                    <div class="style-check-info-card issues">
+                        <div class="style-check-info-head">
+                            <div class="style-check-info-icon">!</div>
+                            <h3>Что можно улучшить</h3>
+                        </div>
+
+                        @if (Model.Result.Issues.Any())
+                        {
+                            <ul class="style-check-list">
+                                @foreach (var item in Model.Result.Issues)
+                                {
+                                    <li>@item</li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <div class="style-check-empty-text">Явных проблем не найдено.</div>
+                        }
+                    </div>
+                </div>
+
+                <div class="style-check-recommendations-card">
+                    <div class="style-check-info-head">
+                        <div class="style-check-info-icon">💡</div>
+                        <h3>Рекомендации</h3>
+                    </div>
+
+                    @if (Model.Result.Recommendations.Any())
                     {
-                        <div class="mb-4">
-                            <div class="p-3 bg-light rounded-4 border">
-                                <div class="fw-semibold mb-2">Общий вывод</div>
-                                <div>@Model.Result.Summary</div>
-                            </div>
-                        </div>
-
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <div class="border rounded-4 p-3 h-100 bg-white">
-                                    <h5 class="mb-3">Сильные стороны</h5>
-                                    @if (Model.Result.Strengths.Any())
-                                    {
-                                        <ul class="mb-0 ps-3">
-                                            @foreach (var item in Model.Result.Strengths)
-                                            {
-                                                <li class="mb-2">@item</li>
-                                            }
-                                        </ul>
-                                    }
-                                    else
-                                    {
-                                        <p class="text-muted mb-0">Сильные стороны не выделены.</p>
-                                    }
-                                </div>
-                            </div>
-
-                            <div class="col-md-6">
-                                <div class="border rounded-4 p-3 h-100 bg-white">
-                                    <h5 class="mb-3">Что можно улучшить</h5>
-                                    @if (Model.Result.Issues.Any())
-                                    {
-                                        <ul class="mb-0 ps-3">
-                                            @foreach (var item in Model.Result.Issues)
-                                            {
-                                                <li class="mb-2">@item</li>
-                                            }
-                                        </ul>
-                                    }
-                                    else
-                                    {
-                                        <p class="text-muted mb-0">Явных проблем не найдено.</p>
-                                    }
-                                </div>
-                            </div>
-
-                            <div class="col-12">
-                                <div class="border rounded-4 p-3 bg-white">
-                                    <h5 class="mb-3">Рекомендации</h5>
-                                    @if (Model.Result.Recommendations.Any())
-                                    {
-                                        <ol class="mb-0 ps-3">
-                                            @foreach (var item in Model.Result.Recommendations)
-                                            {
-                                                <li class="mb-2">@item</li>
-                                            }
-                                        </ol>
-                                    }
-                                    else
-                                    {
-                                        <p class="text-muted mb-0">Рекомендации не были сформированы.</p>
-                                    }
-                                </div>
-                            </div>
-                        </div>
+                        <ol class="style-check-recommendations-list">
+                            @foreach (var item in Model.Result.Recommendations)
+                            {
+                                <li>@item</li>
+                            }
+                        </ol>
                     }
                     else
                     {
-                        <div class="d-flex align-items-center justify-content-center h-100">
-                            <div class="text-center text-muted py-5">
-                                <div class="fs-5 fw-semibold mb-2">Пока нет результата</div>
-                                <div>Нажмите кнопку запуска анализа.</div>
-                            </div>
-                        </div>
+                        <div class="style-check-empty-text">Рекомендации не были сформированы.</div>
                     }
                 </div>
-            </div>
-        </div>
+            }
+            else
+            {
+                <div class="style-check-no-result">
+                    <div class="style-check-no-result-icon">🎯</div>
+                    <div>
+                        <div class="style-check-no-result-title">Результата пока нет</div>
+                        <div class="style-check-no-result-text">
+                            Запустите анализ, чтобы получить оценку стиля, сильные стороны и рекомендации.
+                        </div>
+                    </div>
+                </div>
+            }
+        </section>
     </div>
 </div>
 
@@ -186,4 +188,39 @@
             ]
         });
     </script>
+}
+
+@functions {
+    private string GetAssessmentCssClass(string? assessment)
+    {
+        if (string.IsNullOrWhiteSpace(assessment))
+            return "pending";
+
+        var value = assessment.Trim().ToLowerInvariant();
+
+        if (value == "соответствует")
+            return "success";
+
+        if (value == "частично соответствует")
+            return "warning";
+
+        if (value == "не соответствует")
+            return "danger";
+
+        return "pending";
+    }
+
+    private string NormalizeAssessmentText(string? assessment)
+    {
+        if (string.IsNullOrWhiteSpace(assessment))
+            return "Проверка не выполнена";
+
+        return assessment.Trim() switch
+        {
+            "соответствует" => "Соответствует",
+            "частично соответствует" => "Частично соответствует",
+            "не соответствует" => "Не соответствует",
+            _ => assessment.Trim()
+        };
+    }
 }
